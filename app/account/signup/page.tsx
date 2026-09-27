@@ -1,6 +1,39 @@
+'use client'
 import Link from 'next/link'
 
+import { useState } from "react"
+import { signUp } from "../../../src/lib/auth-client"
+import { useRouter } from "next/navigation"
+import { useNotification } from '../../../src/contexts/NotificationContext'
+
 export default function SignUpPage() {
+  const { showNotification } = useNotification()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [name, setName] = useState("")
+  const router = useRouter()
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const { error } = await signUp.email({
+      email,
+      password,
+      name,
+    })
+
+    if (error) {
+      if (error.message.includes("Invalid email address")) {
+        showNotification("Invalid email")
+      } else {
+        showNotification(error.message)
+      }
+    } else {
+      showNotification("Account sucessfully created")
+      router.push("/account/login")
+    }
+  }
+  
   return (
     <div className="min-h-screen w-full bg-neutral-950 text-amber-50 flex items-center justify-center p-4 selection:bg-amber-500 selection:text-neutral-950">
       
@@ -22,7 +55,7 @@ export default function SignUpPage() {
           </p>
         </div>
         
-        <div className="space-y-5">
+        <form className="space-y-5" onSubmit={handleRegister}>
           
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-amber-400/90 mb-1.5">
@@ -30,6 +63,9 @@ export default function SignUpPage() {
             </label>
             <input
               type="text"
+              value={name}
+              required
+              onChange={(e) => setName(e.target.value)}
               placeholder="ShadowWalker"
               className="w-full px-4 py-3 bg-neutral-950/70 border border-neutral-800 rounded-lg text-neutral-100 placeholder-neutral-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200"
             />
@@ -41,6 +77,9 @@ export default function SignUpPage() {
             </label>
             <input
               type="email"
+              value={email}
+              required
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="user@example.com"
               className="w-full px-4 py-3 bg-neutral-950/70 border border-neutral-800 rounded-lg text-neutral-100 placeholder-neutral-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200"
             />
@@ -52,6 +91,9 @@ export default function SignUpPage() {
             </label>
             <input
               type="password"
+              value={password}
+              required
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••••••"
               className="w-full px-4 py-3 bg-neutral-950/70 border border-neutral-800 rounded-lg text-neutral-100 placeholder-neutral-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200"
             />
@@ -63,18 +105,19 @@ export default function SignUpPage() {
             </label>
             <input
               type="password"
+              required
               placeholder="••••••••••••"
               className="w-full px-4 py-3 bg-neutral-950/70 border border-neutral-800 rounded-lg text-neutral-100 placeholder-neutral-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200"
             />
           </div>
           
           <button
-            type="button"
+            type="submit"
             className="w-full mt-2 py-3.5 px-4 bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-bold uppercase tracking-wider rounded-lg shadow-lg shadow-amber-900/30 border border-amber-400/50 hover:shadow-amber-500/20 active:scale-[0.99] transition-all duration-200 cursor-pointer"
           >
             Sign Up
           </button>
-        </div>
+        </form>
         
         <div className="mt-8 text-center text-sm text-neutral-400">
           Already have an account?{' '}

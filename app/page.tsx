@@ -2,27 +2,23 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import { useSession } from "../src/lib/auth-client"
 
 import { Card } from '../src/components/Card'
-import { Notification } from '../src/components/Notification'
+import { useNotification } from '../src/contexts/NotificationContext'
 
 export default function HomePage() {
   const router = useRouter()
-  const [ visible, setVisible ] = useState(false)
-  
-  const sendNotification = () => {
-    setVisible(true);
-    
-    setTimeout(() => {
-      setVisible(false);
-    }, 3000);
+  const { showNotification } = useNotification()
+  const { data: session, isPending } = useSession()
+
+  if (isPending) {
+    return <div className="p-8 text-amber-50">A carregar sessão...</div>
   }
-
+  
   const handleCardClick = (target: string) => {
-    const isLogged = false
-
-    if (!isLogged) {
-      sendNotification()
+    if (!session) {
+      showNotification("You are not logged.")
       router.push("/account/login")
     } else {
       router.push(target)
@@ -31,12 +27,6 @@ export default function HomePage() {
   
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col items-center justify-center p-4 md:p-12">
-
-      { visible && (
-        <Notification
-          message="You are not logged."
-        />
-      )}
       
       <div className="max-w-4xl w-full bg-slate-900/80 backdrop-blur-md border border-amber-600/30 rounded-2xl p-6 md:p-12 shadow-2xl shadow-red-950/40">
         
