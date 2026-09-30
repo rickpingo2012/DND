@@ -10,11 +10,7 @@ import { useNotification } from '../src/contexts/NotificationContext'
 export default function HomePage() {
   const router = useRouter()
   const { showNotification } = useNotification()
-  const { data: session, isPending } = useSession()
-
-  if (isPending) {
-    return <div className="p-8 text-amber-50">A carregar sessão...</div>
-  }
+  const { data: session } = useSession()
   
   const handleCardClick = (target: string) => {
     if (!session) {
