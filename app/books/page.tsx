@@ -80,7 +80,7 @@ export default function BooksPage() {
       </div>
 
       {/* PDF Reader Modal View */}
-      {selectedBook && (
+      {selectedBook !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-neutral-950/90 backdrop-blur-lg">
           <div className="relative w-full max-w-6xl h-[90vh] bg-neutral-900 border border-amber-500/40 rounded-2xl shadow-2xl shadow-black flex flex-col overflow-hidden pointer-events-none">
             
