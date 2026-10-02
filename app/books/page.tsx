@@ -80,12 +80,12 @@ export default function BooksPage() {
       </div>
 
       {/* PDF Reader Modal View */}
-      {selectedBook && (
+      {selectedBook !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-neutral-950/90 backdrop-blur-lg">
-          <div className="relative w-full max-w-6xl h-[90vh] bg-neutral-900 border border-amber-500/40 rounded-2xl shadow-2xl shadow-black flex flex-col overflow-hidden pointer-events-none">
+          <div className="relative w-full max-w-6xl h-[90vh] bg-neutral-900 border border-amber-500/40 rounded-2xl shadow-2xl shadow-black flex flex-col overflow-hidden">
             
             {/* Modal Top Bar */}
-            <div className="flex items-center justify-between p-4 px-6 bg-neutral-950 border-b border-neutral-800 pointer-events-none">
+            <div className="flex items-center justify-between p-4 px-6 bg-neutral-950 border-b border-neutral-800">
               <div>
                 <h2 className="text-lg md:text-xl font-bold uppercase tracking-wide text-amber-400">
                   {selectedBook.title}
