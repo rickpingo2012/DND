@@ -1,0 +1,130 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --- Tabelas do Better Auth ---
+model User {
+  id            String      @id @default(cuid())
+  name          String
+  email         String      @unique
+  emailVerified Boolean     @default(false)
+  image         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  characters    Character[] // Relacionamento com as fichas
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+// --- Character sheet ---
+
+model Character {
+  id          String   @id @default(cuid())
+  name        String
+  race        String
+  class       String
+  level       Int      @default(1)
+  xp          Int      @default(0)
+  background  String?
+  playerName  String?
+  notes       String?
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  stats       CharacterStats?
+  combat      CharacterCombat?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("character")
+}
+
+model CharacterStats {
+  id          String    @id @default(cuid())
+  characterId String    @unique
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  strength     Int
+  dexterity    Int
+  constitution Int
+  intelligence Int
+  wisdom       Int
+  charisma     Int
+  
+  skills       Json?
+  savingThrows Json?
+
+  @@map("character_stats")
+}
+
+model CharacterCombat {
+  id               String    @id @default(cuid())
+  characterId      String    @unique
+  character        Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  hp               Int?
+  maxHp            Int
+  tempHp           Int?
+  armorClass       Int
+  initiative       Int
+  speed            Int
+  proficiencyBonus Int       @default(0)
+
+  attacks          Json?
+  deathSaves       Json?
+
+  @@map("character_combat")
+}
+
