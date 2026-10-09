@@ -29,13 +29,9 @@ export default function SignUpPage() {
     })
 
     if (error) {
-      if (error.message.includes("Invalid email address")) {
-        showNotification("Invalid email")
-      } else {
-        showNotification(error.message)
-      }
+      showNotification(error?.message ?? 'Account cannot be created')
     } else {
-      showNotification("Account sucessfully created")
+      showNotification('Account sucessfully created')
       router.push("/account/login")
     }
   }
