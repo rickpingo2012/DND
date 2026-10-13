@@ -39,6 +39,7 @@ model Session {
 
 model Account {
   id                    String    @id @default(cuid())
+  idToken               String?
   userId                String
   accountId             String
   providerId            String
