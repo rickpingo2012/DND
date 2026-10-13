@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@better-auth/cli": "^1.4.22",
-    "@prisma/client": "^7.10.0",
+    "@prisma/client": "6.19.3",
     "next": "16.3.6",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -24,7 +24,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "postcss": "^8.5.28",
-    "prisma": "^7.10.0",
+    "prisma": "6.19.3",
     "tailwindcss": "^3.4.19",
     "typescript": "^5"
   }

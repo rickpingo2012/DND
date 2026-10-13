@@ -10,12 +10,18 @@ export default function SignUpPage() {
   const { showNotification } = useNotification()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [name, setName] = useState("")
   const router = useRouter()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (password !== confirmPassword) {
+      showNotification("Passwords do not match")
+      return
+    }
+    
     const { error } = await signUp.email({
       email,
       password,
@@ -23,13 +29,9 @@ export default function SignUpPage() {
     })
 
     if (error) {
-      if (error.message.includes("Invalid email address")) {
-        showNotification("Invalid email")
-      } else {
-        showNotification(error.message)
-      }
+      showNotification(error?.message ?? 'Account cannot be created')
     } else {
-      showNotification("Account sucessfully created")
+      showNotification('Account sucessfully created')
       router.push("/account/login")
     }
   }
@@ -105,7 +107,9 @@ export default function SignUpPage() {
             </label>
             <input
               type="password"
+              value={confirmPassword}
               required
+              onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••••••"
               className="w-full px-4 py-3 bg-neutral-950/70 border border-neutral-800 rounded-lg text-neutral-100 placeholder-neutral-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200"
             />
