@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState } from 'react'
 
 // Helper to calculate D&D ability score modifiers
@@ -54,6 +56,12 @@ export default function CharactersPage() {
     const wisMod = getModifier(newCharForm.wisdom);
     const chaMod = getModifier(newCharForm.charisma);
     const prof = newCharForm.proficiencyBonus;
+
+    const res = await fetch('/api/character', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newCharForm),
+    });
 
     const createdCharacter = {
       id: Date.now().toString(),
@@ -114,7 +122,7 @@ export default function CharactersPage() {
       ],
       deathSaves: { successes: 0, failures: 0 },
     };
-
+    
     setCharacters([...characters, createdCharacter]);
     setIsCreating(false);
     // Reset form defaults
@@ -271,7 +279,7 @@ export default function CharactersPage() {
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 uppercase tracking-wider block mb-1">Class</label>
+                <label className="text-xs text-zinc-400 uppercase tracking-wider block mb-1">Class *</label>
                 <input
                   type="text"
                   name="className"
@@ -282,7 +290,7 @@ export default function CharactersPage() {
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 uppercase tracking-wider block mb-1">Race</label>
+                <label className="text-xs text-zinc-400 uppercase tracking-wider block mb-1">Race *</label>
                 <input
                   type="text"
                   name="race"
@@ -293,7 +301,7 @@ export default function CharactersPage() {
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 uppercase tracking-wider block mb-1">Level</label>
+                <label className="text-xs text-zinc-400 uppercase tracking-wider block mb-1">Level (1)</label>
                 <input
                   type="number"
                   name="level"
