@@ -45,7 +45,7 @@ export default function CharactersPage() {
   };
 
   // Submit handler to save the new character sheet to the vault
-  const handleSaveNewCharacter = (e) => {
+  const handleSaveNewCharacter = async (e) => {
     e.preventDefault();
     if (!newCharForm.name.trim()) return;
 
