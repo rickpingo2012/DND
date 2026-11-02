@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 
 // Helper to calculate D&D ability score modifiers
 const getModifier = (score) => Math.floor((score - 10) / 2);
@@ -8,6 +8,7 @@ const getModifier = (score) => Math.floor((score - 10) / 2);
 export default function CharactersPage() {
   // State for storing all player-created character sheets. Starts completely empty!
   const [characters, setCharacters] = useState([]);
+  const [loadError, setLoadError] = useState('');
   // ID of the character sheet currently being viewed in detail (null = on dashboard)
   const [activeCharacterId, setActiveCharacterId] = useState(null);
   // State to control the creation form modal
@@ -32,6 +33,7 @@ export default function CharactersPage() {
     speed: 30,
     proficiencyBonus: 2,
   });
+  const [attackForms, setAttackForms] = useState([{ name: '', bonus: '', damage: '' }]);
 
   // Handle input changes for the creation form
   const handleFormChange = (e) => {
@@ -43,6 +45,23 @@ export default function CharactersPage() {
         : value,
     }));
   };
+
+  const handleGetCharacters = useCallback(async () => {
+    const res = await fetch('/api/character');
+    const data = await res.json();
+
+    if (!res.ok) {
+      setLoadError(data.error ?? 'Não foi possível carregar os personagens.');
+      return;
+    }
+
+    setLoadError('');
+    setCharacters(data);
+  }, []);
+
+  useEffect(() => {
+    void handleGetCharacters();
+  }, [handleGetCharacters]);
 
   // Submit handler to save the new character sheet to the vault
   const handleSaveNewCharacter = async (e) => {
@@ -56,12 +75,25 @@ export default function CharactersPage() {
     const wisMod = getModifier(newCharForm.wisdom);
     const chaMod = getModifier(newCharForm.charisma);
     const prof = newCharForm.proficiencyBonus;
+    const attacks = attackForms
+      .filter((attack) => attack.name.trim() || attack.bonus.trim() || attack.damage.trim())
+      .map((attack) => ({
+        name: attack.name.trim(),
+        bonus: attack.bonus.trim(),
+        damage: attack.damage.trim(),
+      }));
 
     const res = await fetch('/api/character', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newCharForm),
+      body: JSON.stringify({ ...newCharForm, attacks }),
     });
+
+    if (!res.ok) {
+      const data = await res.json();
+      setLoadError(data.error ?? 'Não foi possível salvar o personagem.');
+      return;
+    }
 
     const createdCharacter = {
       id: Date.now().toString(),
@@ -72,6 +104,7 @@ export default function CharactersPage() {
       xp: newCharForm.xp,
       background: newCharForm.background,
       playerName: newCharForm.playerName || 'Anonymous',
+      notes: newCharForm.notes,
       stats: {
         strength: newCharForm.strength,
         dexterity: newCharForm.dexterity,
@@ -88,6 +121,9 @@ export default function CharactersPage() {
         initiative: dexMod,
         speed: newCharForm.speed,
         proficiencyBonus: prof,
+        attacksName: newCharForm.attacksName,
+        attacksBonus: newCharForm.attacksBonus,
+        attacksDamage: newCharForm.attacksDamage,
       },
       savingThrows: {
         Strength: { proficient: false, modifier: strMod },
@@ -117,13 +153,10 @@ export default function CharactersPage() {
         Stealth: { proficient: false, modifier: dexMod, stat: 'Dex' },
         Survival: { proficient: false, modifier: wisMod, stat: 'Wis' },
       },
-      attacks: [
-        { name: 'Unarmed Strike', bonus: `+${strMod + prof}`, damage: `1 + ${strMod} bludgeoning` }
-      ],
       deathSaves: { successes: 0, failures: 0 },
     };
     
-    setCharacters([...characters, createdCharacter]);
+    handleGetCharacters();
     setIsCreating(false);
     // Reset form defaults
     setNewCharForm({
@@ -145,6 +178,7 @@ export default function CharactersPage() {
       speed: 30,
       proficiencyBonus: 2,
     });
+    setAttackForms([{ name: '', bonus: '', damage: '' }]);
   };
 
   // Find active character for detailed view
@@ -165,6 +199,11 @@ export default function CharactersPage() {
       {/* DASHBOARD VIEW */}
       {!activeCharacter && !isCreating && (
         <div className="max-w-6xl mx-auto">
+          {loadError && (
+            <p role="alert" className="mb-4 text-center text-sm text-rose-400">
+              {loadError}
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             
             {/* Create New Character Square Button (+) */}
@@ -190,7 +229,7 @@ export default function CharactersPage() {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-all" />
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-wider bg-gradient-to-r from-amber-400 to-orange-300 bg-clip-text text-transparent">
-                    Level {char.level} {char.className}
+                    Level {char.level} / {char.class}
                   </span>
                   <h3 className="text-xl font-bold text-zinc-100 mt-1 group-hover:text-amber-400 transition-colors truncate">
                     {char.name}
@@ -253,6 +292,11 @@ export default function CharactersPage() {
           </div>
 
           <form onSubmit={handleSaveNewCharacter} className="space-y-6">
+            {loadError && (
+              <p role="alert" className="text-sm text-rose-400">
+                {loadError}
+              </p>
+            )}
             {/* General Info */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -324,6 +368,17 @@ export default function CharactersPage() {
                 />
               </div>
             </div>
+            <div>
+              <label className="text-xs text-zinc-400 uppercase tracking-wider block mb-1">Notes</label>
+              <input
+                type="text"
+                name="notes"
+                value={newCharForm.notes}
+                onChange={handleFormChange}
+                placeholder="e.g. Any additional notes"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-amber-500"
+              />
+            </div>
 
             {/* Core Stats Section */}
             <div>
@@ -394,6 +449,54 @@ export default function CharactersPage() {
               </div>
             </div>
 
+            <div>
+              <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider mb-3">Attacks</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {attackForms.map((attack, index) => (
+                  <div key={index} className="col-span-2 sm:col-span-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+                      <label className="text-[10px] uppercase text-zinc-400 block mb-1">Attack Name</label>
+                      <input
+                        type="text"
+                        value={attack.name}
+                        onChange={(e) => setAttackForms((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, name: e.target.value } : item))}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded text-center text-sm font-bold text-amber-400 py-1 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+                      <label className="text-[10px] uppercase text-zinc-400 block mb-1">Attack Damage</label>
+                      <input
+                        type="text"
+                        value={attack.damage}
+                        onChange={(e) => setAttackForms((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, damage: e.target.value } : item))}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded text-center text-sm font-bold text-yellow-300 py-1 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+                      <label className="text-[10px] uppercase text-zinc-400 block mb-1">Attack Bonus</label>
+                      <input
+                        type="text"
+                        value={attack.bonus}
+                        onChange={(e) => setAttackForms((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, bonus: e.target.value } : item))}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded text-center text-sm font-bold text-emerald-400 py-1 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setAttackForms((prev) => [...prev, { name: '', bonus: '', damage: '' }])}
+                  aria-label="Adicionar ataque"
+                  title="Adicionar ataque"
+                  className="px-5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-zinc-950 font-bold rounded-lg text-sm shadow-lg transition-all"
+                >
+                  +
+                </button>
+
+              </div>
+            </div>
+
             <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
               <button
                 type="button"
@@ -433,7 +536,7 @@ export default function CharactersPage() {
             <div>
               <span className="text-xs text-zinc-500 uppercase tracking-wider block">Class & Level</span>
               <div className="text-sm font-medium text-zinc-200 mt-1">
-                {activeCharacter.className} (Level {activeCharacter.level})
+                {activeCharacter.class} (Level {activeCharacter.level})
               </div>
             </div>
             <div>
@@ -448,6 +551,13 @@ export default function CharactersPage() {
             </div>
           </div>
 
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-xl space-y-3">
+            <h2 className="text-sm font-bold uppercase tracking-wider bg-gradient-to-r from-amber-400 to-orange-300 bg-clip-text text-transparent text-center border-b border-zinc-800 pb-2">
+              Notes
+            </h2>
+            <p className="text-sm font-medium text-zinc-200 mt-1">{activeCharacter.notes}</p>
+          </div>
+
           {/* Core Stats & Combat/Skills Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
@@ -457,7 +567,14 @@ export default function CharactersPage() {
                 <h2 className="text-sm font-bold uppercase tracking-wider bg-gradient-to-r from-amber-400 to-orange-300 bg-clip-text text-transparent text-center border-b border-zinc-800 pb-2">
                   Core Stats
                 </h2>
-                {Object.entries(activeCharacter.stats).map(([statName, val]) => {
+                {Object.entries({
+                  strength: activeCharacter.stats.strength,
+                  dexterity: activeCharacter.stats.dexterity,
+                  constitution: activeCharacter.stats.constitution,
+                  intelligence: activeCharacter.stats.intelligence,
+                  wisdom: activeCharacter.stats.wisdom,
+                  charisma: activeCharacter.stats.charisma,
+                }).map(([statName, val]) => {
                   const mod = getModifier(val);
                   return (
                     <div
@@ -516,7 +633,7 @@ export default function CharactersPage() {
                     Saving Throws
                   </h3>
                   <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    {Object.entries(activeCharacter.savingThrows).map(([saveName, data]) => (
+                    {Object.entries(activeCharacter.savingThrows ?? {}).map(([saveName, data]) => (
                       <div key={saveName} className="flex items-center justify-between bg-zinc-950 px-3 py-2 rounded-xl border border-zinc-800">
                         <div className="flex items-center gap-2">
                           <input
@@ -555,7 +672,7 @@ export default function CharactersPage() {
                     Skills
                   </h3>
                   <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    {Object.entries(activeCharacter.skills).map(([skillName, data]) => (
+                    {Object.entries(activeCharacter.skills ?? {}).map(([skillName, data]) => (
                       <div key={skillName} className="flex items-center justify-between bg-zinc-950 px-3 py-2 rounded-xl border border-zinc-800">
                         <div className="flex items-center gap-2">
                           <input
@@ -601,7 +718,7 @@ export default function CharactersPage() {
                     Attacks & Spellcasting
                   </h3>
                   <div className="space-y-2">
-                    {activeCharacter.attacks.map((atk, idx) => (
+                    {(activeCharacter.combat.attacks ?? []).map((atk, idx) => (
                       <div key={idx} className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 flex justify-between items-center text-xs">
                         <div>
                           <span className="font-bold text-zinc-200 block">{atk.name}</span>
