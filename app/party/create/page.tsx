@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import { generateRoomCode } from '../../../src/backend/room.ts'
 
 export default function CreatePage() {
   const router = useRouter()
@@ -14,7 +13,8 @@ export default function CreatePage() {
       try {
         const res = await fetch('/api/party/create');
         const data = await res.json();
-        if (isMounted && data.sucess) {
+
+        if (isMounted && data.success && data.url) {
           router.push(data.url)
         }
       } catch (error) {
