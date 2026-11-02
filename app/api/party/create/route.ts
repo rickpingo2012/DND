@@ -1,6 +1,7 @@
 'use server'
 
 import crypto from 'node:crypto';
+import { NextResponse } from 'next/server';
 
 export async function generateRoomCode(length = 8): string {
   const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -14,4 +15,9 @@ export async function generateRoomCode(length = 8): string {
   }
   
   return result;
+}
+
+export async function GET() {
+  const roomCode = generateRoomCode();
+  return NextResponse.json({ success: true, url: `/room/${roomCode}` });
 }
