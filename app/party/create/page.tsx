@@ -13,7 +13,6 @@ export default function CreatePage() {
       try {
         const res = await fetch('/api/party/create');
         const data = await res.json();
-
         if (isMounted && data.success && data.url) {
           router.push(data.url)
         }
