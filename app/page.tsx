@@ -60,7 +60,7 @@ export default function HomePage() {
       <div className="flex flex-col mt-20 gap-8">
         <Card
           tag="Books"
-          title="D&D BOOKS (PDF)"
+          title="D&D books (PDF)"
           description="Read the D&D books, recommended for Masters. You can read the books while you are playing."
           onClick={() => handleCardClick("/books")}
           />
