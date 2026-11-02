@@ -3,7 +3,8 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
-      allowedOrigins: ['192.168.100.102:3000'],
+      allowedOrigins: ['https://damp-crematorium-7vqvp6qw9vggfrgxq.github.dev', 'https://localhost:3000'],
+
     },
   },
 

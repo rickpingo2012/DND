@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth";
-import { prismaAdapter } from "@better-auth/prisma-adapter";
+import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "../lib/prisma";
 
 export const auth = betterAuth({
@@ -9,10 +9,8 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
-    trustedOrigins: [
-        "http://localhost:3000",
-        "https://localhost:3000",
-        process.env.BETTER_AUTH_URL ?? "",
-    ],
+  trustedOrigins: [
+    "https://damp-crematorium-7vqvp6qw9vggfrgxq.github.dev/",
+    "https://localhost:3000",
+  ],
 });
