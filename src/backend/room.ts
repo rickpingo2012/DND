@@ -2,7 +2,7 @@
 
 import crypto from 'node:crypto';
 
-export async function generateRoomCode(length = 8): string {
+export async function generateRoomCode(length = 8): Promise<string> {
   const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let result = '';
   
