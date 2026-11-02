@@ -12,9 +12,10 @@ export default function CreatePage() {
 
     async function initRoom() {
       try {
-        const code = await generateRoomCode()
-        if (isMounted) {
-          router.push(`/room/${code}`)
+        const res = await fetch('/api/party/create');
+        const data = await res.json();
+        if (isMounted && data.sucess) {
+          router.push(data.url)
         }
       } catch (error) {
         console.error('Failed to generate room code:', error)
