@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../src/lib/prisma'; // ajuste para o seu caminho do Prisma Client
-import { auth } from '../../.../src/lib/auth';     // ajuste para a importação do Better Auth
+import { auth } from '../../../src/lib/auth';     // ajuste para a importação do Better Auth
 
 export async function POST(request: Request) {
   try {
