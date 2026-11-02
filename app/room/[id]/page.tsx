@@ -1,0 +1,253 @@
+'use client';
+
+import React, { useState } from 'react';
+
+// Tipos simples para estado visual do Grid e Chat
+interface Token {
+  id: string;
+  name: string;
+  imageUrl: string;
+  x: number;
+  y: number;
+  type: 'hero' | 'monster';
+}
+
+interface ChatMessage {
+  id: string;
+  sender: string;
+  text: string;
+  timestamp: string;
+  isSystem?: boolean;
+}
+
+export default function GameRoomPage() {
+  // Configuração do Grid do Mapa (8x8 para exemplo layout visual)
+  const gridSize = 8;
+  const [tokens, setTokens] = useState<Token[]>([
+    {
+      id: '1',
+      name: 'Fighter (A)',
+      imageUrl: 'https://via.placeholder.com/40/f59e0b/ffffff?text=F',
+      x: 2,
+      y: 3,
+      type: 'hero',
+    },
+    {
+      id: '2',
+      name: 'Goblin',
+      imageUrl: 'https://via.placeholder.com/40/ef4444/ffffff?text=G',
+      x: 5,
+      y: 4,
+      type: 'monster',
+    },
+  ]);
+  const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
+
+  // Rolador de Dados
+  const [lastRoll, setLastRoll] = useState<{ dice: string; result: number | null }>({
+    dice: 'd20',
+    result: null,
+  });
+
+  // Chat Mockup
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { id: '1', sender: 'Dungeon Master', text: 'Welcome to the encounter! Roll for initiative.', timestamp: '14:50', isSystem: true },
+    { id: '2', sender: 'Player B (Fighter)', text: 'Ready to charge into the cavern!', timestamp: '14:51' },
+  ]);
+  const [inputMsg, setInputMsg] = useState('');
+
+  // Função simples de rolagem de dados (Lógica básica de UI)
+  const rollDice = (sides: number) => {
+    const res = Math.floor(Math.random() * sides) + 1;
+    const diceName = `d${sides}`;
+    setLastRoll({ dice: diceName, result: res });
+    
+    // Adiciona feedback visual ao chat
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        sender: 'System',
+        text: `Rolled ${diceName.toUpperCase()}: ${res}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isSystem: true,
+      },
+    ]);
+  };
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputMsg.trim()) return;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        sender: 'Player B',
+        text: inputMsg,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
+    setInputMsg('');
+  };
+
+  return (
+    <div className="min-h-screen bg-[#090a0f] text-slate-200 font-sans p-4 md:p-6 flex flex-col gap-6">
+      {/* HEADER DASESSIONS */}
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-[#11131c] border border-slate-800 rounded-2xl p-4 md:px-6 shadow-lg">
+        <div>
+          <span className="text-xs uppercase tracking-widest font-semibold text-amber-500/80">
+            Tabletop RPG System
+          </span>
+          <h1 className="text-2xl md:text-3xl font-bold font-serif text-amber-500 tracking-wide">
+            Campaign: Shadow of the Cavern
+          </h1>
+        </div>
+
+        {/* Action Button: Edit Character Sheet */}
+        <div className="mt-4 md:mt-0 flex items-center gap-3">
+          <a
+            href="/character/sheet-123" // Caminho específico para a ficha
+            className="px-5 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-medium text-sm transition-all duration-200 shadow-sm flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit Character Sheet
+          </a>
+        </div>
+      </header>
+
+      {/* PAINEL PRINCIPAL (MAPA + SIDEBAR) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+        
+        {/* COLUNA ESQUERDA: MAPA DE COMBATE & DICE ROLLER (8 cols) */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          
+          {/* MAPA DE BATALHA (BATTLEGRID) */}
+          <div className="bg-[#11131c] border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center shadow-lg min-h-[420px]">
+            <div className="w-full flex justify-between items-center mb-4 px-2">
+              <h2 className="text-xs uppercase tracking-widest font-bold text-amber-500">
+                Tactical Map Grid
+              </h2>
+              <span className="text-xs text-slate-400">Click a cell to target or place</span>
+            </div>
+
+            {/* Grid Container */}
+            <div className="grid grid-cols-8 gap-1.5 bg-[#090a0f] p-3 rounded-xl border border-slate-800/80 shadow-inner overflow-auto max-w-full">
+              {Array.from({ length: gridSize * gridSize }).map((_, idx) => {
+                const x = idx % gridSize;
+                const y = Math.floor(idx / gridSize);
+                const token = tokens.find((t) => t.x === x && t.y === y);
+                const isSelected = selectedCell?.x === x && selectedCell?.y === y;
+
+                return (
+                  <button
+                    key={`${x}-${y}`}
+                    onClick={() => setSelectedCell({ x, y })}
+                    className={`w-11 h-11 md:w-14 md:h-14 rounded-lg border transition-all flex items-center justify-center relative ${
+                      isSelected
+                        ? 'border-amber-500 bg-amber-500/10'
+                        : 'border-slate-800/70 bg-[#131520] hover:border-slate-700'
+                    }`}
+                  >
+                    {token && (
+                      <div
+                        className={`w-9 h-9 md:w-11 md:h-11 rounded-full border-2 flex items-center justify-center overflow-hidden shadow-md ${
+                          token.type === 'hero' ? 'border-amber-400 bg-amber-950' : 'border-red-500 bg-red-950'
+                        }`}
+                        title={token.name}
+                      >
+                        <img src={token.imageUrl} alt={token.name} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* SISTEMA DE ROLAGEM DE DADOS (DICE ROLLER) */}
+          <div className="bg-[#11131c] border border-slate-800 rounded-2xl p-4 shadow-lg">
+            <h2 className="text-xs uppercase tracking-widest font-bold text-amber-500 mb-3">
+              Dice Roller
+            </h2>
+
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              {/* Botões dos dados */}
+              <div className="flex flex-wrap gap-2">
+                {[4, 6, 8, 10, 12, 20, 100].map((sides) => (
+                  <button
+                    key={sides}
+                    onClick={() => rollDice(sides)}
+                    className="px-3.5 py-2 rounded-xl bg-[#171926] hover:bg-amber-500/20 border border-slate-800 hover:border-amber-500/40 text-slate-200 font-bold text-sm transition-all"
+                  >
+                    d{sides}
+                  </button>
+                ))}
+              </div>
+
+              {/* Display do Resultado */}
+              <div className="flex items-center gap-3 bg-[#090a0f] border border-slate-800 px-4 py-2 rounded-xl min-w-[140px] justify-center">
+                <span className="text-xs text-slate-400 uppercase font-semibold">
+                  {lastRoll.dice}:
+                </span>
+                <span className="text-xl font-bold text-amber-400">
+                  {lastRoll.result !== null ? lastRoll.result : '-'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* COLUNA DIREITA: CHAT DA SALA (4 cols) */}
+        <div className="lg:col-span-4 bg-[#11131c] border border-slate-800 rounded-2xl p-4 flex flex-col shadow-lg h-[600px] lg:h-auto">
+          <div className="border-b border-slate-800 pb-3 mb-3">
+            <h2 className="text-xs uppercase tracking-widest font-bold text-amber-500">
+              Session Chat Log
+            </h2>
+          </div>
+
+          {/* ÁREA DE MENSAGENS */}
+          <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-800">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`p-3 rounded-xl border text-sm ${
+                  msg.isSystem
+                    ? 'bg-amber-500/5 border-amber-500/20 text-amber-200/90'
+                    : 'bg-[#171926] border-slate-800/80 text-slate-300'
+                }`}
+              >
+                <div className="flex justify-between items-center mb-1">
+                  <span className={`font-semibold text-xs ${msg.isSystem ? 'text-amber-400' : 'text-slate-400'}`}>
+                    {msg.sender}
+                  </span>
+                  <span className="text-[10px] text-slate-500">{msg.timestamp}</span>
+                </div>
+                <p className="leading-relaxed">{msg.text}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* INPUT DO CHAT */}
+          <form onSubmit={handleSendMessage} className="mt-4 pt-3 border-t border-slate-800 flex gap-2">
+            <input
+              type="text"
+              value={inputMsg}
+              onChange={(e) => setInputMsg(e.target.value)}
+              placeholder="Send message to room..."
+              className="flex-1 bg-[#090a0f] border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-xl text-sm transition-colors"
+            >
+              Send
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  );
+}
