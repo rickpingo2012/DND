@@ -76,17 +76,27 @@ export default function GameRoomPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!inputMsg.trim()) return;
 
-    const res = await fetch('/api/name');
-    const data = await res.json();
+    let senderName = 'Anonymous';
+
+    try {
+      const res = await fetch('/api/name');
+      const text = await res.text();
+
+      if (text) {
+        const data = JSON.parse(text);
+        if (data.name) senderName = data.name;
+      }
+    } catch (error) {
+      console.error('Error on search:', error);
+    }
     
     setMessages((prev) => [
       ...prev,
       {
         id: Date.now().toString(),
-        sender: data.name,
+        sender: senderName,
         text: inputMsg,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
