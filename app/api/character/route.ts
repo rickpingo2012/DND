@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '../../../src/lib/prisma'; // ajuste para o seu caminho do Prisma Client
-import { auth } from '../../../src/lib/auth';     // ajuste para a importação do Better Auth
+import { prisma } from '../../../src/lib/prisma';
+import { auth } from '../../../src/lib/auth';
 
 type AbilityScores = {
   strength: number;
