@@ -25,7 +25,7 @@ export default function GameRoomPage() {
   const [tokens, setTokens] = useState<Token[]>([
     {
       id: '1',
-      name: 'Fighter (A)',
+      name: 'Player (A)',
       imageUrl: 'https://via.placeholder.com/40/f59e0b/ffffff?text=F',
       x: 2,
       y: 3,
@@ -39,6 +39,14 @@ export default function GameRoomPage() {
       y: 4,
       type: 'monster',
     },
+    {
+      id: '3',
+      name: 'Player (B)',
+      imageUrl: 'https://via.placeholder.com/40/0000ff/ffffff?text=P',
+      x: 2,
+      y: 7,
+      type: 'hero',
+    },
   ]);
   const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
 
@@ -50,8 +58,7 @@ export default function GameRoomPage() {
 
   // Chat Mockup
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', sender: 'Dungeon Master', text: 'Welcome to the encounter! Roll for initiative.', timestamp: '14:50', isSystem: true },
-    { id: '2', sender: 'Player B (Fighter)', text: 'Ready to charge into the cavern!', timestamp: '14:51' },
+    { id: '1', sender: 'System', text: 'Welcome to the encounter! Roll for initiative.', timestamp: '14:50', isSystem: true },
   ]);
   const [inputMsg, setInputMsg] = useState('');
 
@@ -61,7 +68,7 @@ export default function GameRoomPage() {
     const diceName = `d${sides}`;
     setLastRoll({ dice: diceName, result: res });
     
-    // Adiciona feedback visual ao chat
+    // Add visual feedback to chat
     setMessages((prev) => [
       ...prev,
       {
@@ -106,7 +113,7 @@ export default function GameRoomPage() {
 
   return (
     <div className="min-h-screen bg-[#090a0f] text-slate-200 font-sans p-4 md:p-6 flex flex-col gap-6">
-      {/* HEADER DASESSIONS */}
+      {/* HEADER OF SESSION */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-[#11131c] border border-slate-800 rounded-2xl p-4 md:px-6 shadow-lg">
         <div>
           <span className="text-xs uppercase tracking-widest font-semibold text-amber-500/80">
@@ -187,7 +194,7 @@ export default function GameRoomPage() {
             </h2>
 
             <div className="flex flex-wrap items-center justify-between gap-4">
-              {/* Botões dos dados */}
+              {/* Dice buttons */}
               <div className="flex flex-wrap gap-2">
                 {[4, 6, 8, 10, 12, 20, 100].map((sides) => (
                   <button
