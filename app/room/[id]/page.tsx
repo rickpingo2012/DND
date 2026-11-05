@@ -76,11 +76,12 @@ export default function GameRoomPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!inputMsg.trim()) return;
 
     const res = await fetch('/api/name');
     const data = await res.json();
     
-    if (!inputMsg.trim() || !res) return;
     setMessages((prev) => [
       ...prev,
       {
