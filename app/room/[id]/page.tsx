@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 
-// Tipos simples para estado visual do Grid e Chat
 interface Token {
   id: string;
   name: string;
@@ -21,7 +20,7 @@ interface ChatMessage {
 }
 
 export default function GameRoomPage() {
-  // Configuração do Grid do Mapa (8x8 para exemplo layout visual)
+  // Configs os battle map (8x8)
   const gridSize = 8;
   const [tokens, setTokens] = useState<Token[]>([
     {
@@ -43,7 +42,7 @@ export default function GameRoomPage() {
   ]);
   const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
 
-  // Rolador de Dados
+  // Dice roller
   const [lastRoll, setLastRoll] = useState<{ dice: string; result: number | null }>({
     dice: 'd20',
     result: null,
@@ -56,7 +55,7 @@ export default function GameRoomPage() {
   ]);
   const [inputMsg, setInputMsg] = useState('');
 
-  // Função simples de rolagem de dados (Lógica básica de UI)
+  // Dice rolling function
   const rollDice = (sides: number) => {
     const res = Math.floor(Math.random() * sides) + 1;
     const diceName = `d${sides}`;
@@ -75,14 +74,18 @@ export default function GameRoomPage() {
     ]);
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputMsg.trim()) return;
+
+    const res = await fetch('/api/name');
+    const data = await res.json();
+    
+    if (!inputMsg.trim() || !res) return;
     setMessages((prev) => [
       ...prev,
       {
         id: Date.now().toString(),
-        sender: 'Player B',
+        sender: data.name,
         text: inputMsg,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
@@ -106,7 +109,7 @@ export default function GameRoomPage() {
         {/* Action Button: Edit Character Sheet */}
         <div className="mt-4 md:mt-0 flex items-center gap-3">
           <a
-            href="/character/sheet-123" // Caminho específico para a ficha
+            href="/character"
             className="px-5 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-medium text-sm transition-all duration-200 shadow-sm flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,13 +120,13 @@ export default function GameRoomPage() {
         </div>
       </header>
 
-      {/* PAINEL PRINCIPAL (MAPA + SIDEBAR) */}
+      {/* Main Panel*/}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
         
-        {/* COLUNA ESQUERDA: MAPA DE COMBATE & DICE ROLLER (8 cols) */}
+        {/* Battle map and dice roller */}
         <div className="lg:col-span-8 flex flex-col gap-6">
           
-          {/* MAPA DE BATALHA (BATTLEGRID) */}
+          {/* Battle map */}
           <div className="bg-[#11131c] border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center shadow-lg min-h-[420px]">
             <div className="w-full flex justify-between items-center mb-4 px-2">
               <h2 className="text-xs uppercase tracking-widest font-bold text-amber-500">
@@ -166,7 +169,7 @@ export default function GameRoomPage() {
             </div>
           </div>
 
-          {/* SISTEMA DE ROLAGEM DE DADOS (DICE ROLLER) */}
+          {/* Dice roller UI */}
           <div className="bg-[#11131c] border border-slate-800 rounded-2xl p-4 shadow-lg">
             <h2 className="text-xs uppercase tracking-widest font-bold text-amber-500 mb-3">
               Dice Roller
@@ -186,7 +189,7 @@ export default function GameRoomPage() {
                 ))}
               </div>
 
-              {/* Display do Resultado */}
+              {/* Result dice roll display */}
               <div className="flex items-center gap-3 bg-[#090a0f] border border-slate-800 px-4 py-2 rounded-xl min-w-[140px] justify-center">
                 <span className="text-xs text-slate-400 uppercase font-semibold">
                   {lastRoll.dice}:
@@ -199,7 +202,7 @@ export default function GameRoomPage() {
           </div>
         </div>
 
-        {/* COLUNA DIREITA: CHAT DA SALA (4 cols) */}
+        {/* Room chat */}
         <div className="lg:col-span-4 bg-[#11131c] border border-slate-800 rounded-2xl p-4 flex flex-col shadow-lg h-[600px] lg:h-auto">
           <div className="border-b border-slate-800 pb-3 mb-3">
             <h2 className="text-xs uppercase tracking-widest font-bold text-amber-500">
@@ -207,7 +210,7 @@ export default function GameRoomPage() {
             </h2>
           </div>
 
-          {/* ÁREA DE MENSAGENS */}
+          {/* Messages area */}
           <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-800">
             {messages.map((msg) => (
               <div
@@ -229,7 +232,7 @@ export default function GameRoomPage() {
             ))}
           </div>
 
-          {/* INPUT DO CHAT */}
+          {/* Input of chat */}
           <form onSubmit={handleSendMessage} className="mt-4 pt-3 border-t border-slate-800 flex gap-2">
             <input
               type="text"
