@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../src/lib/prisma';
 import { auth } from '../../../src/lib/auth';
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth.api.getSession({
-    headers: await headers(),
+    headers: await request.headers,
   });
 
   if (!session) {
