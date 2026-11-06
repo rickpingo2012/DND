@@ -15,5 +15,9 @@ export async function GET(request: Request) {
     where: { id: session.user.id }
   })
 
+  if (!user) {
+    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  }
+
   return NextResponse.json({ name: user.name})
 }
