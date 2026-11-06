@@ -58,7 +58,7 @@ export default function GameRoomPage() {
 
   // Chat Mockup
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', sender: 'System', text: 'Welcome to the encounter! Roll for initiative.', timestamp: '14:50', isSystem: true },
+    { id: '1', sender: 'System', text: 'Welcome to the encounter! Roll for initiative.', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), isSystem: true },
   ]);
   const [inputMsg, setInputMsg] = useState('');
 
@@ -138,7 +138,7 @@ export default function GameRoomPage() {
         </div>
       </header>
 
-      {/* Main Panel*/}
+      {/* Main panel*/}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
         
         {/* Battle map and dice roller */}
