@@ -20,6 +20,9 @@ interface ChatMessage {
 }
 
 export default function RoomPage() {
+  // Set the clicked cell id
+  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  
   // Configs os battle map (8x8)
   const gridSize = 8;
   const [tokens, setTokens] = useState<Token[]>([
@@ -193,9 +196,27 @@ export default function RoomPage() {
                 return (
                   <button
                     key={`${x}-${y}`}
-                    onClick={() => setSelectedCell({ x, y })}
+                    onClick={() => {
+                      const clickedToken = tokens.find((t) => t.x === x && t.y === y);
+
+                      if (selectedTokenId) {
+                        setTokens((prev) =>
+                          prev.map((t) => (t.id === selectedTokenId ? { ...t, x, y } : t))
+                        );
+                        setSelectedTokenId(null);
+                        setSelectedCell(null);
+                      } else if (clickedToken) {          
+                        setSelectedTokenId(clickedToken.id);
+                        setSelectedCell({ x, y });
+                      } else {
+                        setSelectedCell({ x, y });
+                        setSelectedTokenId(null);
+                      }
+                    }}
                     className={`w-11 h-11 md:w-14 md:h-14 rounded-lg border transition-all flex items-center justify-center relative ${
-                      isSelected
+                      selectedTokenId && tokens.some((t) => t.id === selectedTokenId && t.x === x && t.y === y)
+                        ? 'border-emerald-500 bg-emerald-500/20 animate-pulse'
+                        : isSelected
                         ? 'border-amber-500 bg-amber-500/10'
                         : 'border-slate-800/70 bg-[#131520] hover:border-slate-700'
                     }`}
