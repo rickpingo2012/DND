@@ -62,8 +62,16 @@ export default function RoomPage() {
   ]);
   const [inputMsg, setInputMsg] = useState('');
 
-  const [newToken, setNewToken] = useState<{ name: string; image: string; type: Token['type'] } | null>(null);
-
+  const [newToken, setNewToken] = useState<{
+    name: string;
+    image: string;
+    type: Token['type'];
+  }>({
+    name: '',
+    image: '',
+    type: 'hero',
+  });
+  
   // Dice rolling function
   const rollDice = (sides: number) => {
     const res = Math.floor(Math.random() * sides) + 1;
@@ -129,7 +137,7 @@ export default function RoomPage() {
       },
     ]);
 
-    setNewToken(null);
+    setNewToken({ name: '', image: '', type: 'hero' });
   };
 
   return (
@@ -246,7 +254,7 @@ export default function RoomPage() {
                 Create a character for map
               </h2>
             </div>
-            <form onSubmit={handleCreateToken} className="mt-4 pt-3 border-t border-slate-800 flex gap-2">
+            <form onSubmit={handleCreateToken} className="mt-4 pt-3 border-t border-slate-800 flex-col sm:flex-row flex gap-2">
               <input 
                 type="text"
                 placeholder="Write the character name"
