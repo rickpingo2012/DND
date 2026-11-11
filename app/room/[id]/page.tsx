@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useNotification } from '../../../src/contexts/NotificationContext'
 
 interface Token {
   id: string;
@@ -20,6 +21,8 @@ interface ChatMessage {
 }
 
 export default function RoomPage() {
+  const { showNotification } = useNotification()
+  
   // Set the clicked cell id
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   
@@ -141,6 +144,19 @@ export default function RoomPage() {
     ]);
 
     setNewToken({ name: '', image: '', type: 'hero' });
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        showNotification('Select a valid image file');
+        return;
+      }
+
+      const localUrl = URL.createObjectURL(file);
+      setNewToken((prev) => (prev ? { ...prev, image: localUrl } : { name: '', image: localUrl, type: 'hero' }));
+    }
   };
 
   return (
@@ -283,13 +299,21 @@ export default function RoomPage() {
                 onChange={e => setNewToken(prev => prev ? { ...prev, name: e.target.value } : { name: e.target.value, image: '', type: 'hero' })}
                 className="flex-1 bg-[#090a0f] border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
               />
-              <input 
-                type="text"
-                placeholder="Write the URL of image to character or digit X to ignore"
-                value={newToken?.image}
-                onChange={e => setNewToken(prev => prev ? { ...prev, image: e.target.value } : { image: e.target.value, name: '', type: 'hero' })}
-                className="flex-1 bg-[#090a0f] border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
-              />
+              <div className="w-full sm:flex-1 flex items-center gap-2 bg-[#090a0f] border border-slate-800 rounded-xl px-3 py-1.5 text-sm text-slate-400">
+                <label htmlFor="file-upload" className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1 rounded-lg text-xs font-medium transition-colors">
+                  Select image
+                </label>
+                <span className="truncate text-xs">
+                  {newToken?.image ? 'Imagem selecionada ✅' : 'Nenhum arquivo'}
+                </span>
+                <input 
+                  id="file-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </div>
               <select className="w-full bg-[#12141c] text-amber-100 border border-amber-500/30 rounded-lg px-4 py-2.5 text-sm shadow-sm transition-all duration-200 hover:border-amber-500/60 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23f59e0b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20stroke%3D%22none%22%20d%3D%220%200h24v24H0z%22%20fill%3D%22none%22%2F%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.75rem_center] bg-no-repeat pr-10">
                 <option value="" disabled className="bg-[#12141c] text-amber-100/60">Selecione uma opção...</option>
                 <option value="hero" className="bg-[#12141c] text-amber-100">Hero</option>
