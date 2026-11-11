@@ -8,7 +8,7 @@ interface Token {
   imageUrl: string;
   x: number;
   y: number;
-  type: 'hero' | 'monster';
+  type: 'hero' | 'monster' | 'animal' | 'npc';
 }
 
 interface ChatMessage {
@@ -19,7 +19,7 @@ interface ChatMessage {
   isSystem?: boolean;
 }
 
-export default function GameRoomPage() {
+export default function RoomPage() {
   // Configs os battle map (8x8)
   const gridSize = 8;
   const [tokens, setTokens] = useState<Token[]>([
@@ -61,6 +61,8 @@ export default function GameRoomPage() {
     { id: '1', sender: 'System', text: 'Welcome to the encounter! Roll for initiative.', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), isSystem: true },
   ]);
   const [inputMsg, setInputMsg] = useState('');
+
+  const [newToken, setNewToken] = useState<{ name: string; image: string; type: Token['type'] } | null>(null);
 
   // Dice rolling function
   const rollDice = (sides: number) => {
@@ -109,6 +111,25 @@ export default function GameRoomPage() {
       },
     ]);
     setInputMsg('');
+  };
+
+  const handleCreateToken = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newToken) return;
+
+    setTokens((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        name: newToken.name,
+        imageUrl: newToken.image !== 'X' ? newToken.image : 'https://via.placeholder.com/40/0000ff/ffffff?text=T',
+        x: 0,
+        y: 0,
+        type: newToken.type,
+      },
+    ]);
+
+    setNewToken(null);
   };
 
   return (
@@ -218,6 +239,43 @@ export default function GameRoomPage() {
               </div>
             </div>
           </div>
+
+          <div className="bg-[#11131c] border border-slate-800 rounded-2xl p-4 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <h2 className="text-xs uppercase tracking-widest font-bold text-amber-500">
+                Create a character for map
+              </h2>
+            </div>
+            <form onSubmit={handleCreateToken} className="mt-4 pt-3 border-t border-slate-800 flex gap-2">
+              <input 
+                type="text"
+                placeholder="Write the character name"
+                value={newToken?.name}
+                onChange={e => setNewToken(prev => prev ? { ...prev, name: e.target.value } : { name: e.target.value, image: '', type: 'hero' })}
+                className="flex-1 bg-[#090a0f] border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
+              />
+              <input 
+                type="text"
+                placeholder="Write the URL of image to character or digit X to ignore"
+                value={newToken?.image}
+                onChange={e => setNewToken(prev => prev ? { ...prev, image: e.target.value } : { image: e.target.value, name: '', type: 'hero' })}
+                className="flex-1 bg-[#090a0f] border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
+              />
+              <select className="w-full bg-[#12141c] text-amber-100 border border-amber-500/30 rounded-lg px-4 py-2.5 text-sm shadow-sm transition-all duration-200 hover:border-amber-500/60 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23f59e0b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20stroke%3D%22none%22%20d%3D%220%200h24v24H0z%22%20fill%3D%22none%22%2F%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.75rem_center] bg-no-repeat pr-10">
+                <option value="" disabled className="bg-[#12141c] text-amber-100/60">Selecione uma opção...</option>
+                <option value="hero" className="bg-[#12141c] text-amber-100">Hero</option>
+                <option value="npc" className="bg-[#12141c] text-amber-100">NPC</option>
+                <option value="monster" className="bg-[#12141c] text-amber-100">Monster</option>
+                <option value="animal" className="bg-[#12141c] text-amber-100">Animal</option>
+              </select>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-xl text-sm transition-colors"
+              >
+                Create
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* Room chat */}
@@ -243,7 +301,7 @@ export default function GameRoomPage() {
                   <span className={`font-semibold text-xs ${msg.isSystem ? 'text-amber-400' : 'text-slate-400'}`}>
                     {msg.sender}
                   </span>
-                  <span className="text-[10px] text-slate-500">{msg.timestamp}</span>
+                  <span className="text-[10px] text-slate-500" suppressHydrationWarning>{msg.timestamp}</span>
                 </div>
                 <p className="leading-relaxed">{msg.text}</p>
               </div>
