@@ -1,7 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNotification } from '../../../src/contexts/NotificationContext'
+import { useParams } from "next/navigation";
+import { io, Socket } from "socket.io-client";
+
+const socket: Socket = io('https://localhost:3001');
 
 interface Token {
   id: string;
@@ -13,7 +17,6 @@ interface Token {
 }
 
 interface ChatMessage {
-  id: string;
   sender: string;
   text: string;
   timestamp: string;
@@ -21,6 +24,8 @@ interface ChatMessage {
 }
 
 export default function RoomPage() {
+  const params = useParams();
+  const roomCode = params.id as string;
   const { showNotification } = useNotification()
   
   // Set the clicked cell id
@@ -31,27 +36,11 @@ export default function RoomPage() {
   const [tokens, setTokens] = useState<Token[]>([
     {
       id: '1',
-      name: 'Player (A)',
-      imageUrl: 'https://via.placeholder.com/40/f59e0b/ffffff?text=F',
-      x: 2,
-      y: 3,
-      type: 'hero',
-    },
-    {
-      id: '2',
       name: 'Goblin',
       imageUrl: 'https://via.placeholder.com/40/ef4444/ffffff?text=G',
       x: 5,
-      y: 4,
+      y: 5,
       type: 'monster',
-    },
-    {
-      id: '3',
-      name: 'Player (B)',
-      imageUrl: 'https://via.placeholder.com/40/0000ff/ffffff?text=P',
-      x: 2,
-      y: 7,
-      type: 'hero',
     },
   ]);
   const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
@@ -64,7 +53,7 @@ export default function RoomPage() {
 
   // Chat Mockup
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', sender: 'System', text: 'Welcome to the encounter! Roll for initiative.', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), isSystem: true },
+    { sender: 'System', text: 'Welcome to the encounter! Roll for initiative.', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), isSystem: true },
   ]);
   const [inputMsg, setInputMsg] = useState('');
 
@@ -77,6 +66,23 @@ export default function RoomPage() {
     image: '',
     type: 'hero',
   });
+
+  useEffect(() => {
+    if (roomCode) socket.emit("join_room", roomCode);
+
+    socket.on("receive_message", (data) => {
+      setMessages((prev) => [...prev, data]);
+    });
+
+    socket.on("sync_map", (data) => {
+      setTokens((prev) => [...prev, data.mapState]);
+    });
+
+    return () => {
+      socket.off("receive_message");
+      socket.off("sync_map");
+    };
+  }, [roomCode]);
   
   // Dice rolling function
   const rollDice = (sides: number) => {
@@ -88,7 +94,6 @@ export default function RoomPage() {
     setMessages((prev) => [
       ...prev,
       {
-        id: Date.now().toString(),
         sender: 'System',
         text: `Rolled ${diceName.toUpperCase()}: ${res}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -115,15 +120,14 @@ export default function RoomPage() {
       console.error('Error on search:', error);
     }
     
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        sender: senderName,
-        text: inputMsg,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
+    socket.emit("send_message", {
+      roomCode,
+      senderName,
+      inputMsg,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isSystem: false,
+    });
+    
     setInputMsg('');
   };
 
@@ -131,18 +135,18 @@ export default function RoomPage() {
     e.preventDefault();
     if (!newToken) return;
 
-    setTokens((prev) => [
-      ...prev,
-      {
+    socket.emit("update_map", {
+      roomCode,
+      mapState: {
         id: Date.now().toString(),
         name: newToken.name,
-        imageUrl: newToken.image !== 'X' ? newToken.image : 'https://via.placeholder.com/40/0000ff/ffffff?text=T',
+        imageUrl: newToken.image,
         x: 0,
         y: 0,
         type: newToken.type,
       },
-    ]);
-
+    });
+    
     setNewToken({ name: '', image: '', type: 'hero' });
   };
 
