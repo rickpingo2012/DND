@@ -5,7 +5,7 @@ import { useNotification } from '../../../src/contexts/NotificationContext'
 import { useParams } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 
-const socket: Socket = io('https://localhost:3001');
+const socket: Socket = io('http://localhost:3001');
 
 interface Token {
   id: string;
@@ -17,6 +17,7 @@ interface Token {
 }
 
 interface ChatMessage {
+  id: string;
   sender: string;
   text: string;
   timestamp: string;
@@ -53,7 +54,7 @@ export default function RoomPage() {
 
   // Chat Mockup
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { sender: 'System', text: 'Welcome to the encounter! Roll for initiative.', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), isSystem: true },
+    { id: '1', sender: 'System', text: 'Welcome to the encounter! Roll for initiative.', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), isSystem: true },
   ]);
   const [inputMsg, setInputMsg] = useState('');
 
@@ -68,10 +69,24 @@ export default function RoomPage() {
   });
 
   useEffect(() => {
-    if (roomCode) socket.emit("join_room", roomCode);
+    const joinRoom = () => {
+      if (roomCode) socket.emit("join_room", roomCode);
+    };
+
+    joinRoom();
+    socket.on("connect", joinRoom);
 
     socket.on("receive_message", (data) => {
-      setMessages((prev) => [...prev, data]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: data.id ?? `${data.sender}-${data.timestamp}-${Date.now()}`,
+          sender: data.sender,
+          text: data.text ?? data.inputMsg ?? '',
+          timestamp: data.timestamp,
+          isSystem: Boolean(data.isSystem),
+        },
+      ]);
     });
 
     socket.on("sync_map", (data) => {
@@ -79,6 +94,7 @@ export default function RoomPage() {
     });
 
     return () => {
+      socket.off("connect", joinRoom);
       socket.off("receive_message");
       socket.off("sync_map");
     };
@@ -94,6 +110,7 @@ export default function RoomPage() {
     setMessages((prev) => [
       ...prev,
       {
+        id: new Date().toLocaleDateString(),
         sender: 'System',
         text: `Rolled ${diceName.toUpperCase()}: ${res}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -120,13 +137,26 @@ export default function RoomPage() {
       console.error('Error on search:', error);
     }
     
+    const messageTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
     socket.emit("send_message", {
       roomCode,
-      senderName,
-      inputMsg,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      sender: senderName,
+      text: inputMsg,
+      time: messageTime,
       isSystem: false,
     });
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `${senderName}-${messageTime}-${Date.now()}`,
+        sender: senderName,
+        text: inputMsg,
+        timestamp: messageTime,
+        isSystem: false,
+      },
+    ]);
     
     setInputMsg('');
   };
@@ -140,7 +170,7 @@ export default function RoomPage() {
       mapState: {
         id: Date.now().toString(),
         name: newToken.name,
-        imageUrl: newToken.image,
+        imageUrl: newToken.image != 'x' ? newToken.image : 'https://via.placeholder.com/40/ef4444/ffffff?text=G',
         x: 0,
         y: 0,
         type: newToken.type,
@@ -155,6 +185,9 @@ export default function RoomPage() {
     if (file) {
       if (!file.type.startsWith('image/')) {
         showNotification('Select a valid image file');
+        return;
+      } else {
+        setNewToken((prev) => (prev ? { ...prev, image: 'x' } : { name: '', image: 'x', type: 'hero' }));
         return;
       }
 
@@ -172,7 +205,7 @@ export default function RoomPage() {
             Tabletop RPG System
           </span>
           <h1 className="text-2xl md:text-3xl font-bold font-serif text-amber-500 tracking-wide">
-            Campaign: Shadow of the Cavern
+            Campaign Master
           </h1>
         </div>
 

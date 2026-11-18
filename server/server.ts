@@ -23,7 +23,7 @@ io.on("connection", (socket) => {
     console.log(`[Room] User ${socket.id} entered in room: ${roomCode}`);
   });
 
-  socket.on("send_message", (data: { roomCode: string; sender: string; text: string; time: string; isSystem: boolean }) => {
+  socket.on("send_message", (data: { roomCode: string; id?: string; sender: string; text: string; time: string; isSystem: boolean }) => {
     io.to(data.roomCode).emit("receive_message", {
       text: data.text,
       sender: data.sender,
