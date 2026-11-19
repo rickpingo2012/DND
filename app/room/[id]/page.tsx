@@ -163,38 +163,43 @@ export default function RoomPage() {
 
   const handleCreateToken = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newToken) return;
+    if (!newToken.name.trim()) {
+      showNotification('Digite um nome para o personagem.');
+      return;
+    }
 
-    socket.emit("update_map", {
+    const tokenToCreate: Token = {
+      id: Date.now().toString(),
+      name: newToken.name.trim(),
+      imageUrl:
+        newToken.image ||
+        'https://via.placeholder.com/40/ef4444/ffffff?text=T',
+      x: selectedCell?.x ?? 0,
+      y: selectedCell?.y ?? 0,
+      type: newToken.type,
+    };
+
+    socket.emit('update_map', {
       roomCode,
-      mapState: {
-        id: Date.now().toString(),
-        name: newToken.name,
-        imageUrl: newToken.image != 'x' ? newToken.image : 'https://via.placeholder.com/40/ef4444/ffffff?text=G',
-        x: 0,
-        y: 0,
-        type: newToken.type,
-      },
+      mapState: tokenToCreate,
     });
-    
+
     setNewToken({ name: '', image: '', type: 'hero' });
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        showNotification('Select a valid image file');
-        return;
-      } else {
-        setNewToken((prev) => (prev ? { ...prev, image: 'x' } : { name: '', image: 'x', type: 'hero' }));
-        return;
-      }
+    if (!file) return;
 
-      const localUrl = URL.createObjectURL(file);
-      setNewToken((prev) => (prev ? { ...prev, image: localUrl } : { name: '', image: localUrl, type: 'hero' }));
+    if (!file.type.startsWith('image/')) {
+      showNotification('Selecione um arquivo de imagem válido.');
+      return;
     }
+
+    const localUrl = URL.createObjectURL(file);
+    setNewToken((prev) => ({ ...prev, image: localUrl }));
   };
+
 
   return (
     <div className="min-h-screen bg-[#090a0f] text-slate-200 font-sans p-4 md:p-6 flex flex-col gap-6">
@@ -351,7 +356,18 @@ export default function RoomPage() {
                   className="hidden"
                 />
               </div>
-              <select className="w-full bg-[#12141c] text-amber-100 border border-amber-500/30 rounded-lg px-4 py-2.5 text-sm shadow-sm transition-all duration-200 hover:border-amber-500/60 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23f59e0b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20stroke%3D%22none%22%20d%3D%220%200h24v24H0z%22%20fill%3D%22none%22%2F%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.75rem_center] bg-no-repeat pr-10">
+              <select 
+
+                value={newToken.type}
+                onChange={(e) =>
+                  setNewToken((prev) => ({
+                    ...prev,
+                  type: e.target.value as Token['type'],
+                  }))
+                }
+                className="w-full bg-[#12141c] text-amber-100 border border-amber-500/30 rounded-lg px-4 py-2.5 text-sm shadow-sm transition-all duration-200 hover:border-amber-500/60 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23f59e0b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20stroke%3D%22none%22%20d%3D%220%200h24v24H0z%22%20fill%3D%22none%22%2F%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.75rem_center] bg-no-repeat pr-10"
+                
+                >
                 <option value="" disabled className="bg-[#12141c] text-amber-100/60">Selecione uma opção...</option>
                 <option value="hero" className="bg-[#12141c] text-amber-100">Hero</option>
                 <option value="npc" className="bg-[#12141c] text-amber-100">NPC</option>
