@@ -7,9 +7,11 @@ export default function CreatePage() {
   const router = useRouter()
 
   useEffect(() => {
-    let isMounted = true
+    let isMounted = true;
 
     async function initRoom() {
+      sessionStorage.setItem('isHost', 'true');
+      
       try {
         const res = await fetch('/api/party/create');
         const data = await res.json();
@@ -19,13 +21,13 @@ export default function CreatePage() {
       } catch (error) {
         console.error('Failed to generate room code:', error)
       }
-    }
+    };
 
     initRoom()
 
     return () => {
       isMounted = false
-    }
+    };
   }, [router])
 
   return (

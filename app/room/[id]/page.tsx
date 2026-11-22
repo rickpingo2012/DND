@@ -46,12 +46,6 @@ export default function RoomPage() {
   ]);
   const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
 
-  // Dice roller
-  const [lastRoll, setLastRoll] = useState<{ dice: string; result: number | null }>({
-    dice: 'd20',
-    result: null,
-  });
-
   // Chat Mockup
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: '1', sender: 'System', text: 'Welcome to the encounter! Roll for initiative.', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), isSystem: true },
@@ -69,94 +63,64 @@ export default function RoomPage() {
   });
 
   useEffect(() => {
-    const joinRoom = () => {
-      if (roomCode) socket.emit("join_room", roomCode);
+    let active = true;
+
+    async function initRoom() {
+      try {
+        const res = await fetch('/api/name');
+        const data = await res.json();
+        const name = data?.name ?? 'error';
+
+        if (!active) return;
+
+        const isHost = sessionStorage.getItem('isHost') === 'true';
+        const action = isHost ? 'create_room' : 'join_room';
+
+        socket.emit(action, name, roomCode);
+      } catch {
+        if (!active) return;
+        const isHost = sessionStorage.getItem('isHost') === 'true';
+        const action = isHost ? 'create_room' : 'join_room';
+        socket.emit(action, 'error', roomCode);
+      }
     };
 
-    joinRoom();
-    socket.on("connect", joinRoom);
+    initRoom();
 
-    socket.on("receive_message", (data) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: data.id ?? `${data.sender}-${data.timestamp}-${Date.now()}`,
-          sender: data.sender,
-          text: data.text ?? data.inputMsg ?? '',
-          timestamp: data.timestamp,
-          isSystem: Boolean(data.isSystem),
-        },
-      ]);
-    });
+    const handleReceiveMessage = (data: ChatMessage) => {
+      setMessages((prev) => [...prev, data]);
+    };
 
-    socket.on("sync_map", (data) => {
-      setTokens((prev) => [...prev, data.mapState]);
-    });
+    const handleSyncMap = (map: Token) => {
+      setTokens((prev) => [...prev, map]);
+    };
+
+    socket.on('receive_message', handleReceiveMessage);
+    socket.on('sync_map', handleSyncMap);
 
     return () => {
-      socket.off("connect", joinRoom);
-      socket.off("receive_message");
-      socket.off("sync_map");
+      active = false;
+      socket.off('receive_message', handleReceiveMessage);
+      socket.off('sync_map', handleSyncMap);
     };
   }, [roomCode]);
+
   
   // Dice rolling function
   const rollDice = (sides: number) => {
-    const res = Math.floor(Math.random() * sides) + 1;
-    const diceName = `d${sides}`;
-    setLastRoll({ dice: diceName, result: res });
-    
-    // Add visual feedback to chat
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: new Date().toLocaleDateString(),
-        sender: 'System',
-        text: `Rolled ${diceName.toUpperCase()}: ${res}`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isSystem: true,
-      },
-    ]);
+    socket.emit("roll_dice", roomCode, sides)
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputMsg.trim()) return;
-
-    let senderName = 'Anonymous';
-
-    try {
-      const res = await fetch('/api/name');
-      const text = await res.text();
-
-      if (text) {
-        const data = JSON.parse(text);
-        if (data.name) senderName = data.name;
-      }
-    } catch (error) {
-      console.error('Error on search:', error);
-    }
     
     const messageTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     socket.emit("send_message", {
       roomCode,
-      sender: senderName,
       text: inputMsg,
-      time: messageTime,
-      isSystem: false,
     });
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `${senderName}-${messageTime}-${Date.now()}`,
-        sender: senderName,
-        text: inputMsg,
-        timestamp: messageTime,
-        isSystem: false,
-      },
-    ]);
     
     setInputMsg('');
   };
@@ -164,7 +128,7 @@ export default function RoomPage() {
   const handleCreateToken = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newToken.name.trim()) {
-      showNotification('Digite um nome para o personagem.');
+      showNotification('Digit a name to character.');
       return;
     }
 
@@ -313,16 +277,6 @@ export default function RoomPage() {
                     d{sides}
                   </button>
                 ))}
-              </div>
-
-              {/* Result dice roll display */}
-              <div className="flex items-center gap-3 bg-[#090a0f] border border-slate-800 px-4 py-2 rounded-xl min-w-[140px] justify-center">
-                <span className="text-xs text-slate-400 uppercase font-semibold">
-                  {lastRoll.dice}:
-                </span>
-                <span className="text-xl font-bold text-amber-400">
-                  {lastRoll.result !== null ? lastRoll.result : '-'}
-                </span>
               </div>
             </div>
           </div>
