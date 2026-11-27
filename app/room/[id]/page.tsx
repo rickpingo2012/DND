@@ -113,6 +113,7 @@ export default function RoomPage() {
     let playerName = 'Player';
     let connStatus: ConnStatus = ConnStatus.Idle;
     let joinedSocketId: string | null = null;
+
     const socket = io(getSocketUrl(), { autoConnect: false, withCredentials: true });
     socketRef.current = socket;
 
@@ -120,37 +121,46 @@ export default function RoomPage() {
       if (!active) return;
 
       if (!result?.ok) {
-        setRoomStatus({ roomCode, status: result?.error ?? 'Não foi possível entrar na sala.' });
+        setRoomStatus({
+          roomCode,
+          status: ConnStatus.Error,
+          errorMsg: result?.error ?? 'Não foi possível entrar na sala.',
+        });
         return;
       }
 
-      setRoomStatus({ roomCode, connStatus });
+      setRoomStatus({ roomCode, status: ConnStatus.Ready });
     };
 
     const enterRoom = () => {
-      if (!active || !socket.connected || !socket.id || !playerName || joinedSocketId === socket.id) return;
+      if (!active || !socket.connected || !socket.id || joinedSocketId === socket.id) return;
       connStatus = ConnStatus.Connecting;
       joinedSocketId = socket.id;
-      setRoomStatus({ roomCode, connStatus });
-      
+      setRoomStatus({ roomCode, status: connStatus });
+
       const isHost = sessionStorage.getItem('isHost') === 'true';
       const action = isHost ? 'create_room' : 'join_room';
-      
-      connStatus = ConnStatus.Idle;
+
       socket.emit(action, { playerName, roomCode }, handleRoomAck);
     };
 
     const handleConnectError = (error: Error) => {
       connStatus = ConnStatus.Error;
-      if (active) setRoomStatus({ roomCode, status: connStatus, errorMsg: `Error on Socket IO: ${error.message}` });
-      connStatus = ConnStatus.Idle;
+      if (active) {
+        setRoomStatus({
+          roomCode,
+          status: connStatus,
+          errorMsg: `Error on Socket IO: ${error.message}`,
+        });
+      }
     };
 
     const handleDisconnect = () => {
       joinedSocketId = null;
       connStatus = ConnStatus.Disconnect;
-      if (active) setRoomStatus({ roomCode, connStatus });
-      connStatus = ConnStatus.Idle;
+      if (active) {
+        setRoomStatus({ roomCode, status: connStatus });
+      }
     };
 
     socket.on('connect', enterRoom);
@@ -159,21 +169,22 @@ export default function RoomPage() {
     socket.on('receive_message', handleReceiveMessage);
     socket.on('sync_map', handleSyncMap);
 
-    async function initRoom() {
+    async function start() {
       try {
         const res = await fetch('/api/name');
         const data = await res.json();
-        if (res.ok && data?.name) playerName = data.name;
+        if (active && res.ok && data?.name?.trim()) {
+          playerName = data.name.trim();
+        }
       } catch {
-        if (!active) return;
+        // If error, still player
       }
 
       if (!active) return;
-      enterRoom();
-    };
+      socket.connect();
+    }
 
-    initRoom();
-    socket.connect();
+    start();
 
     return () => {
       active = false;
@@ -187,7 +198,6 @@ export default function RoomPage() {
     };
   }, [roomCode]);
 
-  
   // Dice rolling function
   const rollDice = (sides: number) => {
     if (!isRoomReady) return;
