@@ -59,6 +59,9 @@ export default function RoomPage() {
   const [roomStatus, setRoomStatus] = useState<{ roomCode: string; status?: string, errorMsg?: string } | null>(null);
   const isRoomReady = roomStatus?.roomCode === roomCode && !(roomStatus.status === ConnStatus.Error);
   const roomError = roomStatus?.roomCode === roomCode ? roomStatus?.errorMsg : undefined;
+  const [tokenToDeleteId, setTokenToDeleteId] = useState<string | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didLongPressRef = useRef(false);
   
   // Set the clicked cell id
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
@@ -107,6 +110,35 @@ export default function RoomPage() {
       return [...prev, updatedToken];
     });
   };
+
+  const handleDeleteToken = (tokenId: string) => {
+    setTokens((prev) => prev.filter((t) => t.id !== tokenId));
+    setSelectedTokenId((prev) => (prev === tokenId ? null : prev));
+    setTokenToDeleteId(null);
+
+    if (isRoomReady) {
+      socketRef.current?.emit('delete_token', { roomCode, tokenId });
+    }
+  };
+
+  const startHold = (tokenId: string) => {
+    didLongPressRef.current = false;
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+
+    holdTimerRef.current = setTimeout(() => {
+      didLongPressRef.current = true;
+      setTokenToDeleteId(tokenId);
+      setSelectedTokenId(null);
+    }, 500);
+  };
+
+  const cancelHold = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  };
+
 
   useEffect(() => {
     let active = true;
@@ -163,11 +195,19 @@ export default function RoomPage() {
       }
     };
 
+    const handleTokenDeleted = ({ tokenId }: { tokenId: string }) => {
+      setTokens((prev) => prev.filter((t) => t.id !== tokenId));
+      setSelectedTokenId((prev) => (prev === tokenId ? null : prev));
+      setTokenToDeleteId((prev) => (prev === tokenId ? null : prev));
+    };
+
+
     socket.on('connect', enterRoom);
     socket.on('connect_error', handleConnectError);
     socket.on('disconnect', handleDisconnect);
     socket.on('receive_message', handleReceiveMessage);
     socket.on('sync_map', handleSyncMap);
+    socket.on('token_deleted', handleTokenDeleted);
 
     async function start() {
       try {
@@ -193,6 +233,7 @@ export default function RoomPage() {
       socket.off('disconnect', handleDisconnect);
       socket.off('receive_message', handleReceiveMessage);
       socket.off('sync_map', handleSyncMap);
+      socket.off('token_deleted', handleTokenDeleted);
       socket.disconnect();
       if (socketRef.current === socket) socketRef.current = null;
     };
@@ -319,59 +360,85 @@ export default function RoomPage() {
                 const isSelected = selectedCell?.x === x && selectedCell?.y === y;
 
                 return (
-                  <button
+                  <div
                     key={`${x}-${y}`}
-                    onClick={() => {
-                      const clickedToken = tokens.find((t) => t.x === x && t.y === y);
-
-                      if (selectedTokenId) {
-                        setTokens((prev) =>
-                          prev.map((t) => (t.id === selectedTokenId ? { ...t, x, y } : t))
-                        );
-                        setSelectedTokenId(null);
-                        setSelectedCell(null);
-                      } else if (clickedToken) {          
-                        setSelectedTokenId(clickedToken.id);
-                        setSelectedCell({ x, y });
-                      } else {
-                        setSelectedCell({ x, y });
-                        setSelectedTokenId(null);
-                      }
-
-                      if (selectedTokenId) {
-                        setTokens((prev) => {
-                          const next = prev.map((t) => (t.id === selectedTokenId ? { ...t, x, y } : t));
-                          const moved = next.find((t) => t.id === selectedTokenId);
-                          if (moved && isRoomReady) {
-                            socketRef.current?.emit('update_map', { roomCode, mapState: moved });
-                          }
-                          return next;
-                        });
-                        
-                        setSelectedTokenId(null);
-                        setSelectedCell(null);
-                      };
+                    onPointerDown={() => {
+                      if (token) startHold(token.id);
                     }}
-                    className={`w-11 h-11 md:w-14 md:h-14 rounded-lg border transition-all flex items-center justify-center relative ${
-                      selectedTokenId && tokens.some((t) => t.id === selectedTokenId && t.x === x && t.y === y)
-                        ? 'border-emerald-500 bg-emerald-500/20 animate-pulse'
-                        : isSelected
-                        ? 'border-amber-500 bg-amber-500/10'
-                        : 'border-slate-800/70 bg-[#131520] hover:border-slate-700'
-                    }`}
-                  >
-                    {token && (
-                      <div
-                        className={`w-9 h-9 md:w-11 md:h-11 rounded-full border-2 flex items-center justify-center overflow-hidden shadow-md ${
-                          token.type === 'hero' ? 'border-amber-400 bg-amber-950' : 'border-red-500 bg-red-950'
-                        }`}
-                        title={token.name}
+                    onPointerUp={cancelHold}
+                    onPointerLeave={cancelHold}
+                    onContextMenu={(e) => e.preventDefault()}
+                    onClick={() => {
+                    if (didLongPressRef.current) {
+                      didLongPressRef.current = false;
+                      return;
+                    }
+                      
+                    if (tokenToDeleteId) {
+                      setTokenToDeleteId(null);
+                      return;
+                    }        
+
+                    if (selectedTokenId) {
+                      setTokens((prev) => {
+                        const next = prev.map((t) => (t.id === selectedTokenId ? { ...t, x, y } : t));
+                        const moved = next.find((t) => t.id === selectedTokenId);
+                        if (moved && isRoomReady) {
+                          socketRef.current?.emit('update_map', { roomCode, mapState: moved });
+                        }
+                        return next;
+                      });
+                      setSelectedTokenId(null);
+                      setSelectedCell(null);
+                    } else if (token) {
+                      setSelectedTokenId(token.id);
+                      setSelectedCell({ x, y });
+                    } else {
+                      setSelectedCell({ x, y });
+                      setSelectedTokenId(null);
+                    }
+                  }}
+                  className={`w-11 h-11 md:w-14 md:h-14 rounded-lg border transition-all flex items-center justify-center relative select-none cursor-pointer ${
+                    selectedTokenId && tokens.some((t) => t.id === selectedTokenId && t.x === x && t.y === y)
+                      ? 'border-emerald-500 bg-emerald-500/20 animate-pulse'
+                      : isSelected
+                      ? 'border-amber-500 bg-amber-500/10'
+                      : 'border-slate-800/70 bg-[#131520] hover:border-slate-700'
+                  }`}
+                >
+                {token && (
+                  <>
+                    <div
+                      className={`w-9 h-9 md:w-11 md:h-11 rounded-full border-2 flex items-center justify-center overflow-hidden shadow-md ${
+                        token.type === 'hero' ? 'border-amber-400 bg-amber-950' : 'border-red-500 bg-red-950'
+                      }`}
+                      title={token.name}
+                    >
+                      <img
+                        src={token.imageUrl}
+                        alt={token.name}
+                        draggable={false}
+                        className="w-full h-full object-cover pointer-events-none"
+                      />
+                    </div>
+
+                    {tokenToDeleteId === token.id && (
+                      <button
+                        type="button"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteToken(token.id);
+                        }}
+                        className="absolute -top-3 -right-3 z-20 px-2 py-0.5 rounded-full bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold shadow-lg border border-red-300/40"
                       >
-                        <img src={token.imageUrl} alt={token.name} className="w-full h-full object-cover" />
-                      </div>
+                        Excluir
+                      </button>
                     )}
-                  </button>
-                );
+                  </>
+                )}
+                </div>
+              );
               })}
             </div>
           </div>

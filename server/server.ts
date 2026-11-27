@@ -26,7 +26,7 @@ interface RoomState {
   code: string;
   hostId: string;
   players: Map<string, { id: string; name: string }>;
-  mapState: MapElement | null;
+  tokens: MapElement[];
 };
 
 interface SocketData {
@@ -76,7 +76,7 @@ function serializeRoom(room: RoomState) {
     code: room.code,
     hostId: room.hostId,
     players: Array.from(room.players.values()),
-    mapState: room.mapState,
+    tokens: room.tokens,
   };
 };
 
@@ -95,7 +95,7 @@ io.on("connection", (socket) => {
       code,
       hostId: socket.id,
       players: new Map([[socket.id, { id: socket.id, name: playerName }]]),
-      mapState: null,
+      tokens: [],
     };
 
     rooms.set(code, room);
@@ -157,8 +157,27 @@ io.on("connection", (socket) => {
     const room = rooms.get(code);
     if (!room) return;
 
-    room.mapState = data.mapState;
+    const index = room.tokens.findIndex((t) => t.id === data.mapState.id);
+    if (index >= 0) {
+      room.tokens[index] = data.mapState;
+    } else {
+      room.tokens.push(data.mapState);
+    }
+
     socket.to(code).emit("sync_map", data.mapState);
+  });
+
+  // Delete a token on map
+  socket.on("delete_token", (data: { roomCode: string; tokenId: string }) => {
+    const code = data?.roomCode?.trim().toUpperCase();
+    const tokenId = data?.tokenId?.trim();
+    if (!code || !tokenId || !socket.rooms.has(code)) return;
+
+    const room = rooms.get(code);
+    if (!room) return;
+
+    room.tokens = room.tokens.filter((t) => t.id !== tokenId);
+    socket.to(code).emit("token_deleted", { tokenId });
   });
 
   // Roll a dice
