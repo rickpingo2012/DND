@@ -25,6 +25,7 @@ interface MapElement {
 interface RoomState {
   code: string;
   hostId: string;
+  campaignName: 'Campaign Master';
   players: Map<string, { id: string; name: string }>;
   tokens: MapElement[];
 };
@@ -75,6 +76,7 @@ function serializeRoom(room: RoomState) {
   return {
     code: room.code,
     hostId: room.hostId,
+    campaignName: room.campaignName,
     players: Array.from(room.players.values()),
     tokens: room.tokens,
   };
@@ -94,6 +96,7 @@ io.on("connection", (socket) => {
     const room: RoomState = {
       code,
       hostId: socket.id,
+      campaignName: 'Campaign Master',
       players: new Map([[socket.id, { id: socket.id, name: playerName }]]),
       tokens: [],
     };
@@ -197,6 +200,24 @@ io.on("connection", (socket) => {
     };
 
     io.to(roomCode).emit("receive_message", systemMsg);
+  });
+
+  socket.on("update_campaign_name", (data: { roomCode: string; name: string }) => {
+    const code = data?.roomCode?.trim().toUpperCase();
+    if (!code || !socket.rooms.has(code)) return;
+
+    const room = rooms.get(code);
+    if (!room || room.hostId !== socket.id) return;
+
+    const cleanName = String(data?.name ?? "")
+      .replace(/[\r\n]+/g, " ")
+      .trim()
+      .slice(0, 80);
+
+    if (!cleanName) return;
+
+    room.campaignName = cleanName;
+    io.to(code).emit("campaign_name_updated", { campaignName: cleanName });
   });
 
   // When player disconnect, if is the Host or if was the last player, delete the room.

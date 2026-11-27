@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useNotification } from '../../../src/contexts/NotificationContext'
+import { useNotification } from '../../../src/contexts/NotificationContext';
+import { HostNotes } from '../../../src/components/HostNotes.tsx'
 import { useParams } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 
@@ -24,7 +25,7 @@ function getSocketUrl() {
   }
 
   return 'http://localhost:3001';
-}
+};
 
 enum ConnStatus {
   Connecting = 'connecting',
@@ -62,6 +63,9 @@ export default function RoomPage() {
   const [tokenToDeleteId, setTokenToDeleteId] = useState<string | null>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPressRef = useRef(false);
+  const [campaignName, setCampaignName] = useState('Campaign Master');
+  const [isHost, setIsHost] = useState(false);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
   
   // Set the clicked cell id
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
@@ -95,6 +99,45 @@ export default function RoomPage() {
     image: '',
     type: 'hero',
   });
+
+  // Clean up a text
+  function sanitizePlainText(raw: string, fallback = 'Campaign Master') {
+    const cleaned = raw
+      .replace(/[\r\n]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 80);
+
+    return cleaned || fallback;
+  };
+
+  // Evade XSS on paste
+  const handlePastePlainText = (e: React.ClipboardEvent<HTMLHeadingElement>) => {
+    if (!isHost) {
+      e.preventDefault();
+      return;
+    }
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    document.execCommand('insertText', false, sanitizePlainText(text, ''));
+  };
+
+  const commitCampaignName = () => {
+    if (!isHost || !titleRef.current) return;
+
+    const currentText = titleRef.current.innerText ?? titleRef.current.textContent ?? '';
+    const safeName = sanitizePlainText(currentText, campaignName);
+
+    titleRef.current.textContent = safeName;
+    setCampaignName(safeName);
+
+    if (isRoomReady) {
+      socketRef.current?.emit('update_campaign_name', {
+        roomCode,
+        name: safeName,
+      });
+    }
+  };
 
   const handleReceiveMessage = (data: ChatMessage) => {
     setMessages((prev) => [...prev, data]);
@@ -141,10 +184,14 @@ export default function RoomPage() {
 
 
   useEffect(() => {
+    const hostFlag = sessionStorage.getItem('isHost') === 'true';
+    
     let active = true;
-    let playerName = 'Player';
+    let playerName = hostFlag ? 'Master' : 'Player';
     let connStatus: ConnStatus = ConnStatus.Idle;
     let joinedSocketId: string | null = null;
+
+    setIsHost(hostFlag);
 
     const socket = io(getSocketUrl(), { autoConnect: false, withCredentials: true });
     socketRef.current = socket;
@@ -169,12 +216,21 @@ export default function RoomPage() {
       connStatus = ConnStatus.Connecting;
       joinedSocketId = socket.id;
       setRoomStatus({ roomCode, status: connStatus });
-
-      const isHost = sessionStorage.getItem('isHost') === 'true';
+      
       const action = isHost ? 'create_room' : 'join_room';
-
       socket.emit(action, { playerName, roomCode }, handleRoomAck);
     };
+
+    const handleCampaignNameUpdated = ({ campaignName: nextName }: { campaignName?: string }) => {
+      if (!active || !nextName) return;
+      const safeName = sanitizePlainText(nextName);
+      setCampaignName(safeName);
+      
+      if (titleRef.current && document.activeElement !== titleRef.current) {
+        titleRef.current.textContent = safeName;
+      }
+    };
+
 
     const handleConnectError = (error: Error) => {
       connStatus = ConnStatus.Error;
@@ -208,6 +264,7 @@ export default function RoomPage() {
     socket.on('receive_message', handleReceiveMessage);
     socket.on('sync_map', handleSyncMap);
     socket.on('token_deleted', handleTokenDeleted);
+    socket.on('campaign_name_updated', handleCampaignNameUpdated);
 
     async function start() {
       try {
@@ -234,6 +291,7 @@ export default function RoomPage() {
       socket.off('receive_message', handleReceiveMessage);
       socket.off('sync_map', handleSyncMap);
       socket.off('token_deleted', handleTokenDeleted);
+      socket.off('campaign_name_updated', handleCampaignNameUpdated);
       socket.disconnect();
       if (socketRef.current === socket) socketRef.current = null;
     };
@@ -317,8 +375,26 @@ export default function RoomPage() {
           <span className="text-xs uppercase tracking-widest font-semibold text-amber-500/80">
             Tabletop RPG System
           </span>
-          <h1 className="text-2xl md:text-3xl font-bold font-serif text-amber-500 tracking-wide">
-            Campaign Master
+          <h1
+            ref={titleRef}
+            contentEditable={isHost}
+            suppressContentEditableWarning
+            onPaste={handlePastePlainText}
+            onBlur={commitCampaignName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                titleRef.current?.blur();
+              }
+            }}
+            title={isHost ? 'Click to edit the campaign name' : 'Only host can edit'}
+            className={`text-2xl md:text-3xl font-bold font-serif text-amber-500 tracking-wide outline-none rounded-lg ${
+              isHost
+                ? 'cursor-text focus:ring-2 focus:ring-amber-500/50 focus:bg-amber-500/5 px-1 -mx-1'
+                : 'cursor-default select-none'
+            }`}
+          >
+            {campaignName}
           </h1>
         </div>
 
@@ -572,8 +648,9 @@ export default function RoomPage() {
             </button>
           </form>
         </div>
-
       </div>
+
+      {isHost && <HostNotes roomCode={roomCode} />}
     </div>
   );
 }
