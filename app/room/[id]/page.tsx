@@ -26,6 +26,14 @@ function getSocketUrl() {
   return 'http://localhost:3001';
 }
 
+enum ConnStatus {
+  Connecting = 'connecting',
+  Disconnect = 'disconnect',
+  Error = 'error',
+  Idle = 'idle',
+  Ready = 'ready'
+};
+
 interface Token {
   id: string;
   name: string;
@@ -48,9 +56,9 @@ export default function RoomPage() {
   const roomCode = params.id as string;
   const { showNotification } = useNotification()
   const socketRef = useRef<Socket | null>(null);
-  const [roomStatus, setRoomStatus] = useState<{ roomCode: string; error?: string } | null>(null);
-  const isRoomReady = roomStatus?.roomCode === roomCode && !roomStatus.error;
-  const roomError = roomStatus?.roomCode === roomCode ? roomStatus.error : undefined;
+  const [roomStatus, setRoomStatus] = useState<{ roomCode: string; status?: string, errorMsg?: string } | null>(null);
+  const isRoomReady = roomStatus?.roomCode === roomCode && !(roomStatus.status === ConnStatus.Error);
+  const roomError = roomStatus?.roomCode === roomCode ? roomStatus?.errorMsg : undefined;
   
   // Set the clicked cell id
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
@@ -89,13 +97,21 @@ export default function RoomPage() {
     setMessages((prev) => [...prev, data]);
   };
 
-  const handleSyncMap = (map: Token) => {
-    setTokens((prev) => [...prev, map]);
+  const handleSyncMap = (updatedToken: Token) => {
+    setTokens((prev) => {
+      const exists = prev.some((t) => t.id === updatedToken.id);
+      if (exists) {
+        return prev.map((t) => (t.id === updatedToken.id ? updatedToken : t));
+      }
+      
+      return [...prev, updatedToken];
+    });
   };
 
   useEffect(() => {
     let active = true;
     let playerName = 'Player';
+    let connStatus: ConnStatus = ConnStatus.Idle;
     let joinedSocketId: string | null = null;
     const socket = io(getSocketUrl(), { autoConnect: false, withCredentials: true });
     socketRef.current = socket;
@@ -104,30 +120,37 @@ export default function RoomPage() {
       if (!active) return;
 
       if (!result?.ok) {
-        setRoomStatus({ roomCode, error: result?.error ?? 'Não foi possível entrar na sala.' });
+        setRoomStatus({ roomCode, status: result?.error ?? 'Não foi possível entrar na sala.' });
         return;
       }
 
-      setRoomStatus({ roomCode });
+      setRoomStatus({ roomCode, connStatus });
     };
 
     const enterRoom = () => {
       if (!active || !socket.connected || !socket.id || !playerName || joinedSocketId === socket.id) return;
+      connStatus = ConnStatus.Connecting;
       joinedSocketId = socket.id;
-      setRoomStatus({ roomCode, error: 'Conectando à sala...' });
-
+      setRoomStatus({ roomCode, connStatus });
+      
       const isHost = sessionStorage.getItem('isHost') === 'true';
       const action = isHost ? 'create_room' : 'join_room';
+      
+      connStatus = ConnStatus.Idle;
       socket.emit(action, { playerName, roomCode }, handleRoomAck);
     };
 
     const handleConnectError = (error: Error) => {
-      if (active) setRoomStatus({ roomCode, error: `Falha na conexão Socket.IO: ${error.message}` });
+      connStatus = ConnStatus.Error;
+      if (active) setRoomStatus({ roomCode, status: connStatus, errorMsg: `Error on Socket IO: ${error.message}` });
+      connStatus = ConnStatus.Idle;
     };
 
     const handleDisconnect = () => {
       joinedSocketId = null;
-      if (active) setRoomStatus({ roomCode, error: 'Conexão perdida. Tentando reconectar...' });
+      connStatus = ConnStatus.Disconnect;
+      if (active) setRoomStatus({ roomCode, connStatus });
+      connStatus = ConnStatus.Idle;
     };
 
     socket.on('connect', enterRoom);
@@ -149,8 +172,8 @@ export default function RoomPage() {
       enterRoom();
     };
 
-    socket.connect();
     initRoom();
+    socket.connect();
 
     return () => {
       active = false;
@@ -201,6 +224,8 @@ export default function RoomPage() {
       type: newToken.type,
     };
 
+    setTokens((prev) => [...prev, tokenToCreate]);
+    
     socketRef.current?.emit('update_map', {
       roomCode,
       mapState: tokenToCreate,
@@ -214,14 +239,24 @@ export default function RoomPage() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      showNotification('Selecione um arquivo de imagem válido.');
+      showNotification('Select a valid image file.');
       return;
     }
 
-    const localUrl = URL.createObjectURL(file);
-    setNewToken((prev) => ({ ...prev, image: localUrl }));
-  };
+    const maxBytes = 500 * 1024;
+    if (file.size > maxBytes) {
+      showNotification('Select a file up to 500 KB.');
+      return;
+    }
 
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setNewToken((prev) => ({ ...prev, image: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="min-h-screen bg-[#090a0f] text-slate-200 font-sans p-4 md:p-6 flex flex-col gap-6">
@@ -292,6 +327,20 @@ export default function RoomPage() {
                         setSelectedCell({ x, y });
                         setSelectedTokenId(null);
                       }
+
+                      if (selectedTokenId) {
+                        setTokens((prev) => {
+                          const next = prev.map((t) => (t.id === selectedTokenId ? { ...t, x, y } : t));
+                          const moved = next.find((t) => t.id === selectedTokenId);
+                          if (moved && isRoomReady) {
+                            socketRef.current?.emit('update_map', { roomCode, mapState: moved });
+                          }
+                          return next;
+                        });
+                        
+                        setSelectedTokenId(null);
+                        setSelectedCell(null);
+                      };
                     }}
                     className={`w-11 h-11 md:w-14 md:h-14 rounded-lg border transition-all flex items-center justify-center relative ${
                       selectedTokenId && tokens.some((t) => t.id === selectedTokenId && t.x === x && t.y === y)

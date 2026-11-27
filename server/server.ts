@@ -29,12 +29,17 @@ interface RoomState {
   mapState: MapElement | null;
 };
 
+interface SocketData {
+  roomCode?: string;
+  playerName?: string;
+};
+
 interface RoomAck {
   ok: boolean;
   error?: string;
   roomCode?: string;
   room?: unknown;
-}
+};
 
 // Set the express
 const app = express();
@@ -48,16 +53,18 @@ app.get('/health', (_req, res) => {
 
 // Create the server and set the CORS
 const server = createServer(app);
-const io = new Server(server, {
+const io = new Server<Record<string, never>, Record<string, never>, Record<string, never>, SocketData>(server, {
   cors: {
     origin: (origin, callback) => {
-      const allowed = !origin || CLIENT_ORIGINS.includes(origin) ||
+      const allowed =
+        !origin ||
+        CLIENT_ORIGINS.includes(origin) ||
         (process.env.NODE_ENV !== "production" && origin.endsWith(".github.dev"));
       callback(null, allowed);
     },
     credentials: true,
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+  },
 });
 
 // A Map to svae the rooms
