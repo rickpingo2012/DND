@@ -1,11 +1,30 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNotification } from '../../../src/contexts/NotificationContext'
 import { useParams } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 
-const socket: Socket = io('http://localhost:3001');
+function getSocketUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+  if (configuredUrl) return configuredUrl;
+
+  const hostname = window.location.hostname;
+  const forwardedHostname = hostname.replace(/-\d+(?=\.app\.github\.dev$)/, '-3001');
+  if (forwardedHostname !== hostname) {
+    return `${window.location.protocol}//${forwardedHostname}`;
+  }
+
+  if (hostname.endsWith('.app.github.dev')) {
+    return `${window.location.protocol}//${hostname.replace(/\.app\.github\.dev$/, '-3001.app.github.dev')}`;
+  }
+
+  if (hostname.endsWith('.github.dev')) {
+    return `${window.location.protocol}//${hostname.replace(/\.github\.dev$/, '-3001.app.github.dev')}`;
+  }
+
+  return 'http://localhost:3001';
+}
 
 interface Token {
   id: string;
@@ -28,6 +47,10 @@ export default function RoomPage() {
   const params = useParams();
   const roomCode = params.id as string;
   const { showNotification } = useNotification()
+  const socketRef = useRef<Socket | null>(null);
+  const [roomStatus, setRoomStatus] = useState<{ roomCode: string; error?: string } | null>(null);
+  const isRoomReady = roomStatus?.roomCode === roomCode && !roomStatus.error;
+  const roomError = roomStatus?.roomCode === roomCode ? roomStatus.error : undefined;
   
   // Set the clicked cell id
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
@@ -62,62 +85,97 @@ export default function RoomPage() {
     type: 'hero',
   });
 
+  const handleReceiveMessage = (data: ChatMessage) => {
+    setMessages((prev) => [...prev, data]);
+  };
+
+  const handleSyncMap = (map: Token) => {
+    setTokens((prev) => [...prev, map]);
+  };
+
   useEffect(() => {
     let active = true;
+    let playerName = 'Player';
+    let joinedSocketId: string | null = null;
+    const socket = io(getSocketUrl(), { autoConnect: false, withCredentials: true });
+    socketRef.current = socket;
+
+    const handleRoomAck = (result: { ok?: boolean; error?: string }) => {
+      if (!active) return;
+
+      if (!result?.ok) {
+        setRoomStatus({ roomCode, error: result?.error ?? 'Não foi possível entrar na sala.' });
+        return;
+      }
+
+      setRoomStatus({ roomCode });
+    };
+
+    const enterRoom = () => {
+      if (!active || !socket.connected || !socket.id || !playerName || joinedSocketId === socket.id) return;
+      joinedSocketId = socket.id;
+      setRoomStatus({ roomCode, error: 'Conectando à sala...' });
+
+      const isHost = sessionStorage.getItem('isHost') === 'true';
+      const action = isHost ? 'create_room' : 'join_room';
+      socket.emit(action, { playerName, roomCode }, handleRoomAck);
+    };
+
+    const handleConnectError = (error: Error) => {
+      if (active) setRoomStatus({ roomCode, error: `Falha na conexão Socket.IO: ${error.message}` });
+    };
+
+    const handleDisconnect = () => {
+      joinedSocketId = null;
+      if (active) setRoomStatus({ roomCode, error: 'Conexão perdida. Tentando reconectar...' });
+    };
+
+    socket.on('connect', enterRoom);
+    socket.on('connect_error', handleConnectError);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('receive_message', handleReceiveMessage);
+    socket.on('sync_map', handleSyncMap);
 
     async function initRoom() {
       try {
         const res = await fetch('/api/name');
         const data = await res.json();
-        const name = data?.name ?? 'error';
-
-        if (!active) return;
-
-        const isHost = sessionStorage.getItem('isHost') === 'true';
-        const action = isHost ? 'create_room' : 'join_room';
-
-        socket.emit(action, name, roomCode);
+        if (res.ok && data?.name) playerName = data.name;
       } catch {
         if (!active) return;
-        const isHost = sessionStorage.getItem('isHost') === 'true';
-        const action = isHost ? 'create_room' : 'join_room';
-        socket.emit(action, 'error', roomCode);
       }
+
+      if (!active) return;
+      enterRoom();
     };
 
+    socket.connect();
     initRoom();
-
-    const handleReceiveMessage = (data: ChatMessage) => {
-      setMessages((prev) => [...prev, data]);
-    };
-
-    const handleSyncMap = (map: Token) => {
-      setTokens((prev) => [...prev, map]);
-    };
-
-    socket.on('receive_message', handleReceiveMessage);
-    socket.on('sync_map', handleSyncMap);
 
     return () => {
       active = false;
+      socket.off('connect', enterRoom);
+      socket.off('connect_error', handleConnectError);
+      socket.off('disconnect', handleDisconnect);
       socket.off('receive_message', handleReceiveMessage);
       socket.off('sync_map', handleSyncMap);
+      socket.disconnect();
+      if (socketRef.current === socket) socketRef.current = null;
     };
   }, [roomCode]);
 
   
   // Dice rolling function
   const rollDice = (sides: number) => {
-    socket.emit("roll_dice", roomCode, sides)
+    if (!isRoomReady) return;
+    socketRef.current?.emit("roll_dice", { roomCode, sides })
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputMsg.trim()) return;
-    
-    const messageTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (!isRoomReady || !inputMsg.trim()) return;
 
-    socket.emit("send_message", {
+    socketRef.current?.emit("send_message", {
       roomCode,
       text: inputMsg,
     });
@@ -143,7 +201,7 @@ export default function RoomPage() {
       type: newToken.type,
     };
 
-    socket.emit('update_map', {
+    socketRef.current?.emit('update_map', {
       roomCode,
       mapState: tokenToCreate,
     });
@@ -272,6 +330,7 @@ export default function RoomPage() {
                   <button
                     key={sides}
                     onClick={() => rollDice(sides)}
+                    disabled={!isRoomReady}
                     className="px-3.5 py-2 rounded-xl bg-[#171926] hover:bg-amber-500/20 border border-slate-800 hover:border-amber-500/40 text-slate-200 font-bold text-sm transition-all"
                   >
                     d{sides}
@@ -344,6 +403,7 @@ export default function RoomPage() {
             <h2 className="text-xs uppercase tracking-widest font-bold text-amber-500">
               Session Chat Log
             </h2>
+            {roomError && <p role="alert" className="mt-2 text-xs text-red-400">{roomError}</p>}
           </div>
 
           {/* Messages area */}
@@ -379,6 +439,7 @@ export default function RoomPage() {
             />
             <button
               type="submit"
+              disabled={!isRoomReady}
               className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-xl text-sm transition-colors"
             >
               Send

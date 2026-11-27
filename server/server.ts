@@ -6,7 +6,9 @@ import cors from "cors";
 
 // Set the server port, max players in room and the client origin
 const PORT = Number(process.env.PORT) || 3001;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "https://localhost:3000";
+const CLIENT_ORIGINS = (process.env.CLIENT_ORIGIN || "http://localhost:3000,https://localhost:3000")
+  .split(",")
+  .map((origin) => origin.trim());
 const MAX_PLAYERS = 10;
 
 // Interface to standardize the map elements
@@ -27,6 +29,13 @@ interface RoomState {
   mapState: MapElement | null;
 };
 
+interface RoomAck {
+  ok: boolean;
+  error?: string;
+  roomCode?: string;
+  room?: unknown;
+}
+
 // Set the express
 const app = express();
 app.use(cors());
@@ -41,7 +50,12 @@ app.get('/health', (_req, res) => {
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: CLIENT_ORIGIN,
+    origin: (origin, callback) => {
+      const allowed = !origin || CLIENT_ORIGINS.includes(origin) ||
+        (process.env.NODE_ENV !== "production" && origin.endsWith(".github.dev"));
+      callback(null, allowed);
+    },
+    credentials: true,
     methods: ["GET", "POST"]
   }
 });
@@ -64,8 +78,10 @@ io.on("connection", (socket) => {
   console.log(`[Socket] User connect: ${socket.id}`);
 
   // When the Host create a room, save the room in rooms
-  socket.on("create_room", (payload: { playerName?: string, roomCode?: string }, ack?: (res: any) => void) => {
+  socket.on("create_room", (payload: { playerName?: string, roomCode?: string }, ack?: (res: RoomAck) => void) => {
     const code = payload?.roomCode?.trim().toUpperCase();
+    if (!code) return ack?.({ ok: false, error: "Invalid room code" });
+
     const playerName = payload?.playerName?.trim() || "Host";
 
     const room: RoomState = {
@@ -78,12 +94,13 @@ io.on("connection", (socket) => {
     rooms.set(code, room);
     socket.join(code);
     socket.data.roomCode = code;
+    socket.data.playerName = playerName;
 
     ack?.({ ok: true, roomCode: code, room: serializeRoom(room) });
   });
 
   // When some player enter in room, verify if that room exists and if the room is not full. If not, enter in room
-  socket.on("join_room", (payload: { playerName?: string, roomCode?: string }, ack?: (res: any) => void) => {
+  socket.on("join_room", (payload: { playerName?: string, roomCode?: string }, ack?: (res: RoomAck) => void) => {
     const code = payload?.roomCode?.trim().toUpperCase();
     const room = code ? rooms.get(code) : undefined;
 
@@ -96,6 +113,7 @@ io.on("connection", (socket) => {
     
     console.log(`[Room] User ${socket.id} entered in room: ${code}`);
     socket.data.roomCode = code;
+    socket.data.playerName = playerName;
 
     socket.emit("room_state", serializeRoom(room));
       io.to(code).emit("player_joined", {
@@ -137,9 +155,11 @@ io.on("connection", (socket) => {
   });
 
   // Roll a dice
-  socket.on("roll_dice", ({ roomCode, sides }) => {
+  socket.on("roll_dice", (data: { roomCode?: string; sides?: number }) => {
+    const roomCode = data?.roomCode?.trim().toUpperCase();
+    const sides = data?.sides;
     const validSides = [4, 6, 8, 10, 12, 20, 100];
-    if (!validSides.includes(sides)) return;
+    if (!roomCode || sides === undefined || !socket.rooms.has(roomCode) || !validSides.includes(sides)) return;
 
     const result = Math.floor(Math.random() * sides) + 1;
     const systemMsg = {
