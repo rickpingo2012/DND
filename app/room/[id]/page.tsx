@@ -35,6 +35,11 @@ enum ConnStatus {
   Ready = 'ready'
 };
 
+interface PlayerItem {
+  id: string;
+  name: string;
+};
+
 interface Token {
   id: string;
   name: string;
@@ -66,6 +71,9 @@ export default function RoomPage() {
   const [campaignName, setCampaignName] = useState('Campaign Master');
   const [isHost, setIsHost] = useState(false);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const maxPlayers = 10;
+  const [players, setPlayers] = useState<PlayerItem[]>([]);
+  const [hostId, setHostId] = useState<string | null>(null);
   
   // Set the clicked cell id
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
@@ -196,7 +204,11 @@ export default function RoomPage() {
     const socket = io(getSocketUrl(), { autoConnect: false, withCredentials: true });
     socketRef.current = socket;
 
-    const handleRoomAck = (result: { ok?: boolean; error?: string }) => {
+    const handleRoomAck = (result: {
+      ok?: boolean;
+      error?: string;
+      room?: { hostId?: string; players?: PlayerItem[] };
+    }) => {
       if (!active) return;
 
       if (!result?.ok) {
@@ -208,8 +220,27 @@ export default function RoomPage() {
         return;
       }
 
+      if (result.room?.players) {
+        setPlayers(result.room.players);
+      }
+      if (result.room?.hostId) {
+        setHostId(result.room.hostId);
+      }
+
       setRoomStatus({ roomCode, status: ConnStatus.Ready });
     };
+
+    const handlePlayerJoined = (data: { players?: PlayerItem[] }) => {
+      if (!active || !data?.players) return;
+      setPlayers(data.players);
+    };
+
+    const handlePlayerLeft = (data: { players?: PlayerItem[]; hostId?: string }) => {
+      if (!active) return;
+      if (data?.players) setPlayers(data.players);
+      if (data?.hostId) setHostId(data.hostId);
+    };
+
 
     const enterRoom = () => {
       if (!active || !socket.connected || !socket.id || joinedSocketId === socket.id) return;
@@ -230,7 +261,6 @@ export default function RoomPage() {
         titleRef.current.textContent = safeName;
       }
     };
-
 
     const handleConnectError = (error: Error) => {
       connStatus = ConnStatus.Error;
@@ -265,6 +295,8 @@ export default function RoomPage() {
     socket.on('sync_map', handleSyncMap);
     socket.on('token_deleted', handleTokenDeleted);
     socket.on('campaign_name_updated', handleCampaignNameUpdated);
+    socket.on('player_joined', handlePlayerJoined);
+    socket.on('player_left', handlePlayerLeft);
 
     async function start() {
       try {
@@ -292,6 +324,8 @@ export default function RoomPage() {
       socket.off('sync_map', handleSyncMap);
       socket.off('token_deleted', handleTokenDeleted);
       socket.off('campaign_name_updated', handleCampaignNameUpdated);
+      socket.off('player_joined', handlePlayerJoined);
+      socket.off('player_left', handlePlayerLeft);
       socket.disconnect();
       if (socketRef.current === socket) socketRef.current = null;
     };
@@ -597,6 +631,42 @@ export default function RoomPage() {
               </button>
             </form>
           </div>
+        </div>
+
+        {/* Player list */}
+        <div className="bg-[#11131c] border border-slate-800 rounded-2xl p-4 shadow-lg">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3">
+            <h2 className="text-xs uppercase tracking-widest font-bold text-amber-500">
+              Players in Room
+            </h2>
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              {players.length}/{maxPlayers}
+            </span>
+          </div>
+
+          {players.length === 0 ? (
+            <p className="text-xs text-slate-500">Waiting for players...</p>
+          ) : (
+            <ul className="space-y-1.5 max-h-40 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800">
+              {players.map((player) => (
+                <li
+                  key={player.id}
+                  className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#171926] border border-slate-800/80 text-sm text-slate-200"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                    <span className="truncate">{player.name}</span>
+                  </div>
+
+                  {player.id === hostId && (
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                      Host
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Room chat */}
