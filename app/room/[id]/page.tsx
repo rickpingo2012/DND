@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNotification } from '../../../src/contexts/NotificationContext';
-import { HostNotes } from '../../../src/components/HostNotes.tsx'
+import { HostNotes } from '../../../src/components/HostNotes'
 import { useParams } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 
@@ -217,7 +217,7 @@ export default function RoomPage() {
       joinedSocketId = socket.id;
       setRoomStatus({ roomCode, status: connStatus });
       
-      const action = isHost ? 'create_room' : 'join_room';
+      const action = hostFlag ? 'create_room' : 'join_room';
       socket.emit(action, { playerName, roomCode }, handleRoomAck);
     };
 

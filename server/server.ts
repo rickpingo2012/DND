@@ -25,7 +25,7 @@ interface MapElement {
 interface RoomState {
   code: string;
   hostId: string;
-  campaignName: 'Campaign Master';
+  campaignName: string;
   players: Map<string, { id: string; name: string }>;
   tokens: MapElement[];
 };
